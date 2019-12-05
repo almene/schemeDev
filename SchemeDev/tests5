@@ -1,0 +1,6 @@
+python3 tree_subgroup_processing.py --in_vcf core.vcf --in_nwk iqtree.snps.nwk --reference NZ_CP012921.fasta --min_members 5 --min_snps 1 >sehgroup5snp1.txt
+python3 tree_subgroup_processing.py --in_vcf core.vcf --in_nwk iqtree.snps.nwk --reference NZ_CP012921.fasta --min_members 5 --min_snps 2 >sehgroup5snp2.txt
+python3 tree_subgroup_processing.py --in_vcf core.vcf --in_nwk iqtree.snps.nwk --reference NZ_CP012921.fasta --min_members 5 --min_snps 3 >sehgroup5snp3.txt
+python3 tree_subgroup_processing.py --in_vcf core.vcf --in_nwk iqtree.snps.nwk --reference NZ_CP012921.fasta --min_members 5 --min_snps 4 >sehgroup5snp4.txt
+python3 tree_subgroup_processing.py --in_vcf core.vcf --in_nwk iqtree.snps.nwk --reference NZ_CP012921.fasta --min_members 5 --min_snps 5 >sehgroup5snp5.txt
+python3 tree_subgroup_processing.py --in_vcf core.vcf --in_nwk iqtree.snps.nwk --reference NZ_CP012921.fasta --min_members 5 --min_snps 6 >sehgroup5snp6.txt
