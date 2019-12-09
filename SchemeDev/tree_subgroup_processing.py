@@ -653,9 +653,11 @@ def main():
                 if working_group == 0:
                     biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
                 else:
+                    # if the group has already been used just pull the information
                     if working_group in used.keys():
                         biohansel_codes.values[k,i] = used[working_group]
                     else:
+                        # if the value in the previous row is a zero start a new clade from the root
                         if biohansel_codes.values[k, i - 1] == 0:
                             for attempt in range(1, biohansel_codes.shape[0]):
                                 if attempt in current_codes.keys():
@@ -663,6 +665,7 @@ def main():
                                 else:
                                     new_code = str(attempt)
                                     break
+                        # if there was a non-zero value in the previous column
                         else:
                             if biohansel_codes.values[k, i-1] in current_codes.keys():
                                 current_max = max(current_codes[biohansel_codes.values[k, i-1]])+1
@@ -677,11 +680,16 @@ def main():
         print(test)
         print(dropped)
         print(biohansel_codes)"""
+    # for translating old column numbers to the new ones in the new matrix with dropped columns get the old indexs
+    # and the indexes of the indexes is the new column number
     kept = n_unique[n_unique > 1].index
     rank_id = int()
     row_id = int()
     # print(biohansel_codes.shape)
+    log = open(f"{vcf_file}_biohansel.log", "w+")
+    fasta_file = open(f"{vcf_file}_biohansel.fasta", "w+")
     for rank in scheme:
+        # translate the rank into the position in the table that has all the undefined columns are dropped
         for i in range(0, dropped.shape[1]):
             if int(kept[i]) == int(rank):
                 rank_id = i
@@ -693,22 +701,36 @@ def main():
 
         # print(rank_id)
         for group_id in scheme[rank]:
-            # get biohansel code for that rank, group combo
-            for row in range(0,dropped.shape[0]):
-                if str(test.values[row, rank]) == str(group_id):
-                    row_id = row
-                    break
-                """else:
-                    print(f"{test.values[row, rank]} does not equal {int(group_id)}")"""
-            code = biohansel_codes.values[row_id, rank_id]
+            if path == "tree":
+                # get biohansel code for that rank, group combo
+                for row in range(0, dropped.shape[0]):
+                    if str(test.values[row, rank]) == str(group_id):
+                        row_id = row
+                        break
+                    """else:
+                        print(f"{test.values[row, rank]} does not equal {int(group_id)}")"""
+                code = biohansel_codes.values[row_id, rank_id]
+            # if the information from the groups in already provided use the old group codes
+            if path == "groups":
+                code = group_id
+
             for item in range(0, len(scheme[rank][group_id])):
+                # exclude the the entries that have qc problems
                 if len(scheme[rank][group_id][item]["qc_warnings"]) != 0:
                     continue
+                # extract the required information from the entries that have good qc
                 position = scheme[rank][group_id][item]["position"]
                 pos_tile = scheme[rank][group_id][item]["positive_tile"]
                 neg_tile = scheme[rank][group_id][item]["negative_tile"]
-                print(f"{position}\t{code}\t{pos_tile}")
-                print(f"negative{position}\t{code}\t{neg_tile}")
+
+                # write out the biohansel fasta files and the accompanying logs
+                log.write(f"{position}\t{code}\t{pos_tile}\n")
+                fasta_file.write(f">{position}|{code}\n{pos_tile}\n")
+                log.write(f"negative{position}\t{code}\t{neg_tile}\n")
+                fasta_file.write(f">negative{position}|{code}\n{neg_tile}\n")
+    log.close()
+    fasta_file.close()
+
 
 # call main function
 if __name__ == '__main__':
