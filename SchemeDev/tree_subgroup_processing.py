@@ -7,6 +7,7 @@ import numpy as np
 import random
 import pandas as pd
 import csv
+import re
 
 
 def parse_args():
@@ -124,12 +125,13 @@ def search_st(ingroup, potential_rank, potential_group, subtrees):
 
 def tsv_to_membership(infile):
     groups = dict()
+    used = dict()
     with open(infile) as tsvfile:
         reader = csv.reader(tsvfile, delimiter="\t")
         max_len = 0
         for row in reader:
             leaf = row[0]
-            if len(row)>max_len:
+            if len(row) > max_len:
                 max_len = len(row)
             for i in range(1, len(row)):
                 if row[i] == "":
@@ -142,11 +144,51 @@ def tsv_to_membership(infile):
                         groups[leaf] = [row[i]]
                     else:
                         groups[leaf].append(row[i])
-    # ensure that all values are the same length for later matrixing
-    for key in groups.keys():
-        while len(groups[key])<max_len:
-            groups[key].append(0)
+                    if i not in used.keys():
+                        used[i] = [row[i]]
+                    else:
+                        used[i].append(row[i])
 
+    # ensure that all values are the same length for later matrix creation
+    for key in groups.keys():
+        while len(groups[key]) < max_len:
+            groups[key].append(0)
+    # ensure that all entries are numbers and replace to unique numbers if not already
+    non_valid = r'[^0-9/.]'
+    switch = dict()
+    for i in range(0, max_len):
+        switch = dict()
+        new = str()
+        for key in groups.keys():
+            checking = str(groups[key][i])
+            if i > 0:
+                checking = str(groups[key][i-1]) + "." + checking
+            # check to see if the value contains only the accepted characters
+            if re.search(non_valid, checking):
+                if checking not in switch.keys():
+                    if i == 0:
+                        for j in range(1, len(groups.keys())):
+                            if str(j) in used[i + 1]:
+                                continue
+                            else:
+                                new = str(j)
+                                break
+                        switch[checking] = new
+                    else:
+                        for j in range(1, len(groups.keys())):
+                            new = str(groups[key][i-1]) + "." + str(j)
+                            if new in used[i + 1]:
+                                continue
+                            else:
+                                break
+                        switch[checking] = new
+                    used[i + 1].append(switch[checking])
+                groups[key][i] = switch[checking]
+
+            else:
+                continue
+    print(used)
+    print(groups)
     return groups
 
 
@@ -633,9 +675,9 @@ def main():
         current_max = 1
         used = dict()
         current_ids = dict()
-        for j in range(0,col_groups[i]):
-            for k in range(0,biohansel_codes.shape[0]):
-                if dropped.values[k,i] not in current_ids.keys():
+        for j in range(0, col_groups[i]):
+            for k in range(0, biohansel_codes.shape[0]):
+                if dropped.values[k, i] not in current_ids.keys():
                     current_ids[dropped.values[k, i]] = [k]
                 else:
                     current_ids[dropped.values[k, i]].append(k)
