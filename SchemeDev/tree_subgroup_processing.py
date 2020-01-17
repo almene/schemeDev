@@ -2,7 +2,7 @@ from ete3 import Tree
 from ete3 import parser
 from Bio import SeqIO
 import vcfpy
-from argparse import (ArgumentParser, FileType)
+from argparse import ArgumentParser
 import numpy as np
 import random
 import pandas as pd
@@ -124,6 +124,15 @@ def search_st(ingroup, potential_rank, potential_group, subtrees):
 
 
 def tsv_to_membership(infile):
+    """
+        obtain the hierarchical divisions that are present in a given tsv file for latter functions to assess
+        :param
+            infile: string
+            indicates the file name of the group membership information
+        :return:
+            groups: dictionary
+            Contains the group information with the leaves as keys and the list of groups as values
+        """
     groups = dict()
     used = dict()
     with open(infile) as tsvfile:
@@ -155,7 +164,6 @@ def tsv_to_membership(infile):
             groups[key].append(0)
     # ensure that all entries are numbers and replace to unique numbers if not already
     non_valid = r'[^0-9/.]'
-    switch = dict()
     for i in range(0, max_len):
         switch = dict()
         new = str()
@@ -205,6 +213,7 @@ def parse_tree(tree_file):
 
 def get_tree_groups(ete3_tree_obj):
     """
+    obtain the hierarchical divisions that are present in a given tree for latter functions to assess
     :param
         ete3_tree_obj: ete3 tree object
         Takes an ete3 format tree for processing into groupings indicated by the tree structure
@@ -263,17 +272,16 @@ def get_tree_groups(ete3_tree_obj):
     return memberships
 
 
-def main():
-    # collect relevant user input and parse it into the appropriate variables
-    global ref_seq
-    global memberships
-    args = parse_args()
-    nwk_treefile = args.in_nwk
-    reference_fasta = args.reference
-    vcf_file = args.in_vcf
-    min_snps = args.min_snps
-    min_group_size = args.min_members
-    group_info = args.group_info
+def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info):
+    """
+    :param
+        nwk_treefile:
+        reference_fast:
+        vcf_file:
+        min_snps:
+        min_group_size:
+        group_info:
+    """
     path = ""
     # double check that the user has input only one way to get group info
     if group_info == "none" and nwk_treefile == "none":
@@ -400,16 +408,24 @@ def main():
             if state == 0:
                 count_ref += 1
                 ref_group.append(sample_name)
-            else:
+            elif state == 1:
                 count_alt += 1
                 alt_group.append(sample_name)
+            else:
+                print("there is a problem reading the state information")
             tracker += 1
 
+        # generate places to put group and rank information
         valid_ranks = list()
+        valid_ranks_alt = list()
         valid_groups = list()
+        valid_groups_alt = list()
         conflict_positions = dict()
         ref_candidate_partitions = dict()
         alt_candidate_partitions = dict()
+
+        # if there is variation at the snp location search to see if the partitioning suggested by the snp is
+        # one that is present in the provided tree
         if count_ref >= 1 and count_alt >= 1:
             if len(ref_group) in subtrees.keys():
                 valid_ranks, valid_groups = search_st(ref_group, valid_ranks, valid_groups, subtrees)
@@ -422,6 +438,7 @@ def main():
                     for item in ref_candidate_partitions[valid_ranks[i]]:
                         if item["position"] == position:
                             """print(f"Warning duplication of {position}")"""
+                    # if the partition is already supported add the information about that snp if not created it
                     ref_candidate_partitions[valid_ranks[i]].append({"position": position, "ref_base": ref_base,
                                                                      "alt_base": alt_base,
                                                                      "ref_count": count_ref,
@@ -430,24 +447,25 @@ def main():
                                                                      "group_id": valid_groups[i],
                                                                      "rank_id": valid_ranks[i],
                                                                      "qc_warnings": []})
-            valid_ranks, valid_groups = search_st(alt_group, valid_ranks, valid_groups, subtrees)
-            if len(valid_ranks) > 0:
-                for i in range(0, len(valid_ranks)):
-                    if valid_ranks[i] not in alt_candidate_partitions:
-                        alt_candidate_partitions[valid_ranks[i]] = list()
-                    if valid_groups[i] == 0:
+            if len(alt_group) in subtrees.keys():
+                valid_ranks_alt, valid_groups_alt = search_st(alt_group, valid_ranks, valid_groups, subtrees)
+            if len(valid_ranks_alt) > 0:
+                for i in range(0, len(valid_ranks_alt)):
+                    if valid_ranks_alt[i] not in alt_candidate_partitions:
+                        alt_candidate_partitions[valid_ranks_alt[i]] = list()
+                    if valid_groups_alt[i] == 0:
                         continue
                     # get the tile start from the position and tile information
                     start = position - 1 - mid_point
-                    alt_candidate_partitions[valid_ranks[i]].append({"position": position,
-                                                                     "ref_base": ref_base,
-                                                                     "alt_base": alt_base,
-                                                                     "ref_count": count_ref,
-                                                                     "alt_count": count_alt,
-                                                                     "positive_group": "alt",
-                                                                     "group_id": valid_groups[i],
-                                                                     "rank_id": valid_ranks[i],
-                                                                     "qc_warnings": []})
+                    alt_candidate_partitions[valid_ranks_alt[i]].append({"position": position,
+                                                                         "ref_base": ref_base,
+                                                                         "alt_base": alt_base,
+                                                                         "ref_count": count_ref,
+                                                                         "alt_count": count_alt,
+                                                                         "positive_group": "alt",
+                                                                         "group_id": valid_groups_alt[i],
+                                                                         "rank_id": valid_ranks_alt[i],
+                                                                         "qc_warnings": []})
             positions = dict()
 
             for rank in ref_candidate_partitions:
@@ -474,29 +492,6 @@ def main():
                     if not item["group_id"] in scheme[rank]:
                         scheme[rank][item["group_id"]] = []
                     scheme[rank][item["group_id"]].append(item)
-
-            """ for rank in ref_candidate_partitions:
-                for item in ref_candidate_partitions[rank]:
-                    pos = item["position"]
-                    # filter out groups which are too small
-                    if item['ref_count'] < min_group_size:
-                        continue
-                    if positions[pos] == 1:
-                        print("{}\t{}".format(item, "REF-Single"))
-                    else:
-                        print("{}\t{}".format(item, "REF-Multi"))
-
-            for rank in alt_candidate_partitions:
-                for item in alt_candidate_partitions[rank]:
-                    pos = item["position"]
-                    # filter out groups which are too small
-                    if item['alt_count'] < min_group_size:
-                        continue
-                    if positions[pos] == 1:
-                        # print("Success")
-                        print("{}\t{}".format(item, "ALT-Single"))
-                    else:
-                        print("{}\t{}".format(item, "ALT-Multi"))"""
 
     # filter out groups with less than minimum number of supporting snps
     required_tiles = []
@@ -571,6 +566,11 @@ def main():
                     scheme[rank][group_id][item]["negative_tile"] = ref_seq[start:position - 1] + \
                                                                     scheme[rank][group_id][item]["alt_base"] + \
                                                                     ref_seq[position:position + mid_point]
+                    tile = scheme[rank][group_id][item]["positive_tile"]
+                    ref_tile = ref_seq[start:start + 31]
+                    # print(f">{start}-1")
+                    # print(f"{tile}")
+
                 elif scheme[rank][group_id][item]["positive_group"] == "alt":
                     scheme[rank][group_id][item]["positive_tile"] = ref_seq[start:position - 1] + \
                                                                     scheme[rank][group_id][item]["alt_base"] + \
@@ -578,6 +578,11 @@ def main():
                     scheme[rank][group_id][item]["negative_tile"] = ref_seq[start:position - 1] + \
                                                                     scheme[rank][group_id][item]["ref_base"] + \
                                                                     ref_seq[position:position + mid_point]
+                    tile = scheme[rank][group_id][item]["negative_tile"]
+                    ref_tile = ref_seq[start:start + 31]
+                    # print(f">negative{start}-2")
+                    # print(f"{tile}")
+
                 else:
                     print("something went wrong")
                 # if position has conflicts add degenerate bases
@@ -609,37 +614,14 @@ def main():
             if good_snps < min_snps:
                 for item in range(0, len(scheme[rank][group_id])):
                     scheme[rank][group_id][item]["qc_warnings"].append("Lacks good tile support")
-            """if max(positions) - min(positions) < size_cutoff:
-                for item in range(0, len(scheme[rank][group_id])):
-                    scheme[rank][group_id][item]["qc_warnings"].append("All support snps in the same genetic region")"""
+
     stripped_pos = []
     for rank in scheme:
         for group_id in scheme[rank]:
             for item in range(0, len(scheme[rank][group_id])):
                 if len(scheme[rank][group_id][item]["qc_warnings"]) == 0:
+                    stripped_pos.append(scheme[rank][group_id][item]["position"])
 
-                     stripped_pos.append(scheme[rank][group_id][item]["position"])
-    """# write out stripped vcf file
-    reader = vcfpy.Reader.from_path(vcf_file)
-    writer = vcfpy.Writer.from_path('stripped_core.vcf', reader.header)
-    for record in reader:
-        print("I'm doing something!")
-        if not record.is_snv():
-            continue
-        line = [record.CHROM, record.POS, record.REF]
-        line += [alt.value for alt in record.ALT]
-        position = record.POS
-        print(position)
-        if position in stripped_pos:
-            writer.write_record(record)"""
-
-    # print out scheme information
-    """for rank in scheme:
-        for group_id in scheme[rank]:
-            # pull the tiles without degenerate bases
-            for item in range(0, len(scheme[rank][group_id])):
-                print("{}\t{}".format(scheme[rank][group_id][item], f"with group restrictions of {min_group_size}"
-                                                                    f" members and {min_snps} snps"))"""
     # generate matrix representation to store masked rank, ID info
     # length of row
     rama = len(memberships[random.choice(list(memberships))])
@@ -671,52 +653,57 @@ def main():
     col_groups = list(n_unique)
     biohansel_codes = dropped
     new_code = str()
+    current_ids = dict()
     for i in range(1, biohansel_codes.shape[1]):
         current_max = 1
         used = dict()
-        current_ids = dict()
-        for j in range(0, col_groups[i]):
-            for k in range(0, biohansel_codes.shape[0]):
-                if dropped.values[k, i] not in current_ids.keys():
-                    current_ids[dropped.values[k, i]] = [k]
-                else:
-                    current_ids[dropped.values[k, i]].append(k)
+        current_ids[i] = dict()
+        for k in range(0, biohansel_codes.shape[0]):
+            if dropped.values[k, i] not in current_ids[i].keys():
+                current_ids[i][dropped.values[k, i]] = [k]
+            else:
+                current_ids[i][dropped.values[k, i]].append(k)
                     # this stores both the current group ids under consideration but also a list of all the rows that
                     # have that id
-        else:
-            for k in range(0, biohansel_codes.shape[0]): # go to every row
-                # cycle through ids, skipping zero an identify which is connected to current line
-                working_group = -1
-                new_code=str()
-                for identifier in current_ids.keys():
-                    if k in current_ids[identifier]:
-                        working_group = identifier
-                # if that row is associated with group zero at column i just copy from left
-                if working_group == 0:
-                    biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
+        for k in range(0, biohansel_codes.shape[0]):
+            # go to every row cycle through ids,
+            # skipping zero and identify which is connected to current line
+            working_group = -1
+            new_code = str()
+            for identifier in current_ids[i].keys():
+                if k in current_ids[i][identifier]:
+                    working_group = identifier
+            # if that row is associated with group zero at column i just copy from left
+            if working_group == 0:
+                biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
+            else:
+                # if the group has already been used just pull the information
+                if working_group in used.keys():
+                    biohansel_codes.values[k, i] = used[working_group]
                 else:
-                    # if the group has already been used just pull the information
-                    if working_group in used.keys():
-                        biohansel_codes.values[k,i] = used[working_group]
+                    # if the value in the previous row is a zero start a new clade from the root
+                    if biohansel_codes.values[k, i - 1] == 0:
+                        for attempt in range(1, biohansel_codes.shape[0]):
+                            if attempt in current_codes.keys():
+                                continue
+                            else:
+                                new_code = str(attempt)
+                                break
+                    # if the new group only shaves off one member ignore it and coppy from the left
+                    elif i > 0:
+                        last_group = dropped.values[k, i - 1]
+                        this_group = dropped.values[k, i]
+                        print(f"last column{last_group}, this column{this_group}")
+                    # if there was a non-zero value in the previous column build off of that node
                     else:
-                        # if the value in the previous row is a zero start a new clade from the root
-                        if biohansel_codes.values[k, i - 1] == 0:
-                            for attempt in range(1, biohansel_codes.shape[0]):
-                                if attempt in current_codes.keys():
-                                    continue
-                                else:
-                                    new_code = str(attempt)
-                                    break
-                        # if there was a non-zero value in the previous column
-                        else:
-                            if biohansel_codes.values[k, i-1] in current_codes.keys():
-                                current_max = max(current_codes[biohansel_codes.values[k, i-1]])+1
-                            if biohansel_codes.values[k, i-1] not in current_codes.keys():
-                                current_codes[biohansel_codes.values[k, i - 1]] = []
-                            current_codes[biohansel_codes.values[k, i - 1]].append(current_max)
-                            new_code = str(biohansel_codes.values[k, i - 1])+"."+str(current_max)
-                        biohansel_codes.values[k,i] = new_code
-                        used[working_group] = new_code
+                        if biohansel_codes.values[k, i - 1] in current_codes.keys():
+                            current_max = max(current_codes[biohansel_codes.values[k, i - 1]]) + 1
+                        if biohansel_codes.values[k, i - 1] not in current_codes.keys():
+                            current_codes[biohansel_codes.values[k, i - 1]] = []
+                        current_codes[biohansel_codes.values[k, i - 1]].append(current_max)
+                        new_code = str(biohansel_codes.values[k, i - 1]) + "." + str(current_max)
+                    biohansel_codes.values[k, i] = new_code
+                    used[working_group] = new_code
     """with pd.option_context('display.max_rows', None, 'display.max_columns',
                            None):  # more options can be specified also
         print(test)
@@ -728,8 +715,18 @@ def main():
     rank_id = int()
     row_id = int()
     # print(biohansel_codes.shape)
-    log = open(f"{vcf_file}_biohansel.log", "w+")
-    fasta_file = open(f"{vcf_file}_biohansel.fasta", "w+")
+    codes = open("codes.log", "w+")
+    for i in range(0, len(leaves) - 1):
+        codes.write(f"{leaves[i]} : {biohansel_codes.values[i, -1]}\n")
+    codes.close()
+    log = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.log", "w+")
+    fasta_file = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.fasta", "w+")
+    check = open("wtf.txt", "w+")
+    for i in range(0, biohansel_codes.shape[0]):
+        check.write("{}\t{}".format(biohansel_codes.index.values[i],
+                                    "\t".join(str(v) for v in biohansel_codes.values[i,])) + "\n")
+
+    check.close()
     for rank in scheme:
         # translate the rank into the position in the table that has all the undefined columns are dropped
         for i in range(0, dropped.shape[1]):
@@ -738,11 +735,12 @@ def main():
                 # print(f"found : {int(kept[i])} equals {int(rank)}")
                 break
             # else:
-                # print(f"error finding {rank}")
-                # print(f"{int(kept[i])} does not equal {int(rank)}")
+            # print(f"error finding {rank}")
+            # print(f"{int(kept[i])} does not equal {int(rank)}")
 
         # print(rank_id)
         for group_id in scheme[rank]:
+            code = ""
             if path == "tree":
                 # get biohansel code for that rank, group combo
                 for row in range(0, dropped.shape[0]):
@@ -767,13 +765,28 @@ def main():
 
                 # write out the biohansel fasta files and the accompanying logs
                 log.write(f"{position}\t{code}\t{pos_tile}\n")
-                fasta_file.write(f">{position}|{code}\n{pos_tile}\n")
+                fasta_file.write(f">{position}-{code}\n{pos_tile}\n")
                 log.write(f"negative{position}\t{code}\t{neg_tile}\n")
-                fasta_file.write(f">negative{position}|{code}\n{neg_tile}\n")
+                fasta_file.write(f">negative{position}-{code}\n{neg_tile}\n")
     log.close()
     fasta_file.close()
 
 
+def main():
+    # collect relevant user input and parse it into the appropriate variables
+    global ref_seq
+    global memberships
+    args = parse_args()
+    nwk_treefile = args.in_nwk
+    reference_fasta = args.reference
+    vcf_file = args.in_vcf
+    min_snps = args.min_snps
+    min_group_size = args.min_members
+    group_info = args.group_info
+    identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info)
+
 # call main function
+
+
 if __name__ == '__main__':
     main()
