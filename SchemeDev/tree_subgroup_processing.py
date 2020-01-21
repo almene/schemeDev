@@ -651,7 +651,7 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
     n_unique = dropped.apply(pd.Series.nunique)
     current_codes = dict()
     col_groups = list(n_unique)
-    biohansel_codes = dropped
+    biohansel_codes = dropped.copy()
     new_code = str()
     current_ids = dict()
     for i in range(1, biohansel_codes.shape[1]):
