@@ -706,6 +706,8 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                     else:
                         if biohansel_codes.values[k, i - 1] in current_codes.keys():
                             current_max = max(current_codes[biohansel_codes.values[k, i - 1]]) + 1
+                        else:
+                            current_max = 1
                         if biohansel_codes.values[k, i - 1] not in current_codes.keys():
                             current_codes[biohansel_codes.values[k, i - 1]] = []
                         current_codes[biohansel_codes.values[k, i - 1]].append(current_max)
