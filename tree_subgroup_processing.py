@@ -725,7 +725,7 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
     # print(biohansel_codes.shape)
     codes = open("codes.log", "w+")
     for i in range(0, len(leaves) - 1):
-        codes.write(f"{leaves[i]} : {biohansel_codes.values[i, -1]}\n")
+        codes.write(f"{biohansel_codes.index[i]} : {biohansel_codes.values[i, -1]}\n")
     codes.close()
     log = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.log", "w+")
     fasta_file = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.fasta", "w+")
