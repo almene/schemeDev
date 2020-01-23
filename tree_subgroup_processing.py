@@ -22,6 +22,8 @@ def parse_args():
                               help="Number of cannonical SNPs required to define a group")
     parser_inner.add_argument('--min_members', type=int, required=False, default=5,
                               help="Minimum number of members to define a group")
+    parser_inner.add_argument('--min_parent', type=int, required=False, default=2,
+                              help="Minimum size difference between new group and parent group to be considered valid")
     parser_inner.add_argument('--group_info', type=str, required=False, default="none",
                               help="A tsv file that contains the leaf ids and group information,"
                                    " for specific formatting information please see the README")
@@ -272,7 +274,7 @@ def get_tree_groups(ete3_tree_obj):
     return memberships
 
 
-def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info):
+def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info, min_parent_size):
     """
     :param
         nwk_treefile:
@@ -651,10 +653,10 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
     n_unique = dropped.apply(pd.Series.nunique)
     current_codes = dict()
     col_groups = list(n_unique)
-    biohansel_codes = dropped
+    biohansel_codes = dropped.copy()
     new_code = str()
     current_ids = dict()
-    for i in range(1, biohansel_codes.shape[1]):
+    for i in range(0, biohansel_codes.shape[1]):
         current_max = 1
         used = dict()
         current_ids[i] = dict()
@@ -663,18 +665,29 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                 current_ids[i][dropped.values[k, i]] = [k]
             else:
                 current_ids[i][dropped.values[k, i]].append(k)
-                    # this stores both the current group ids under consideration but also a list of all the rows that
-                    # have that id
+                # this stores both the current group ids under consideration but also a list of all the rows that
+                # have that id
+        if i == 0:
+            continue
         for k in range(0, biohansel_codes.shape[0]):
+            # if there was a non-zero value in the previous column build off of that node
             # go to every row cycle through ids,
             # skipping zero and identify which is connected to current line
             working_group = -1
             new_code = str()
-            for identifier in current_ids[i].keys():
-                if k in current_ids[i][identifier]:
-                    working_group = identifier
+            for thing in current_ids[i].keys():
+                if k in current_ids[i][thing]:
+                    working_group = thing
+            # if the new group is only N smaller than the previous group mask by copy from left
+            this_group = 0
+            last_group = min_parent_size
+            if i > 0:
+                last_group = len(current_ids[i-1][dropped.values[k, (i - 1)]])
+                this_group = len(current_ids[i][dropped.values[k, i]])
+            if last_group - this_group < min_parent_size:
+                    biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
             # if that row is associated with group zero at column i just copy from left
-            if working_group == 0:
+            elif working_group == 0:
                 biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
             else:
                 # if the group has already been used just pull the information
@@ -690,11 +703,6 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                                 new_code = str(attempt)
                                 break
                     # if the new group only shaves off one member ignore it and coppy from the left
-                    elif i > 0:
-                        last_group = dropped.values[k, i - 1]
-                        this_group = dropped.values[k, i]
-                        print(f"last column{last_group}, this column{this_group}")
-                    # if there was a non-zero value in the previous column build off of that node
                     else:
                         if biohansel_codes.values[k, i - 1] in current_codes.keys():
                             current_max = max(current_codes[biohansel_codes.values[k, i - 1]]) + 1
@@ -775,7 +783,6 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
 def main():
     # collect relevant user input and parse it into the appropriate variables
     global ref_seq
-    global memberships
     args = parse_args()
     nwk_treefile = args.in_nwk
     reference_fasta = args.reference
@@ -783,7 +790,8 @@ def main():
     min_snps = args.min_snps
     min_group_size = args.min_members
     group_info = args.group_info
-    identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info)
+    min_parent_size = args.min_parent
+    identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info, min_parent_size)
 
 # call main function
 
