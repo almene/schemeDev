@@ -686,6 +686,7 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                 this_group = len(current_ids[i][dropped.values[k, i]])
             if last_group - this_group < min_parent_size:
                     biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
+            # NOTE: NEED TO ADD QC FLAG TO SCHEME ENTRIES
             # if that row is associated with group zero at column i just copy from left
             elif working_group == 0:
                 biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
@@ -731,12 +732,13 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
     codes.close()
     log = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.log", "w+")
     fasta_file = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.fasta", "w+")
-    check = open("wtf.txt", "w+")
+    check = open("checking.txt", "w+")
     for i in range(0, biohansel_codes.shape[0]):
         check.write("{}\t{}".format(biohansel_codes.index.values[i],
                                     "\t".join(str(v) for v in biohansel_codes.values[i,])) + "\n")
 
     check.close()
+    first_instance = dict()
     for rank in scheme:
         # translate the rank into the position in the table that has all the undefined columns are dropped
         for i in range(0, dropped.shape[1]):
@@ -760,6 +762,10 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                     """else:
                         print(f"{test.values[row, rank]} does not equal {int(group_id)}")"""
                 code = biohansel_codes.values[row_id, rank_id]
+                # mark the rank of first instance , if it shows up again it is a masked internal node and tiles
+                # should not be output
+                if code not in first_instance.keys():
+                    first_instance[code] = rank_id
             # if the information from the groups in already provided use the old group codes
             if path == "groups":
                 code = group_id
@@ -768,6 +774,10 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                 # exclude the the entries that have qc problems
                 if len(scheme[rank][group_id][item]["qc_warnings"]) != 0:
                     continue
+                if rank_id != first_instance[code]:
+                    continue
+                if rank_id < first_instance[code]:
+                    print("There has been an error in logic")
                 # extract the required information from the entries that have good qc
                 position = scheme[rank][group_id][item]["position"]
                 pos_tile = scheme[rank][group_id][item]["positive_tile"]
