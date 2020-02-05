@@ -1,3 +1,10 @@
+"""
+Describe module
+
+
+"""
+
+
 from ete3 import Tree
 from ete3 import parser
 from Bio import SeqIO
@@ -11,7 +18,14 @@ import re
 
 
 def parse_args():
-    """Parse the input arguments, use '-h' for help"""
+    """
+    Parse the input arguments, use '-h' for help
+
+        Returns
+        -------
+            parser_inner.parse_args()
+
+    """
     parser_inner = ArgumentParser(
         description='BIO_Hansel Scheme development')
     parser_inner.add_argument('--in_vcf', type=str, required=True, help='VCF File of SNPs')
@@ -34,6 +48,8 @@ def get_subtrees(tree_mem):
     """
        break the tree membership information into which subtrees of a given size are present
 
+       preparatory step for saving computational steps when comparing only group memberships of the same size
+
        Parameters
        ----------
        tree_mem : dictionary
@@ -54,7 +70,7 @@ def get_subtrees(tree_mem):
     for i in range(0, max_rank):
         # blank the dictionary for the current subtree
         subtree = dict()
-        # for each of the leaves in the tree membership dictionary rearange the information so that the key is the
+        # for each of the leaves in the tree membership dictionary rearrange the information so that the key is the
         # group_id and the value is a list of all the leaves that are in that subtree
         for key in tree_mem.keys():
             tree_id = tree_mem[key][i]
@@ -127,7 +143,7 @@ def search_st(ingroup, potential_rank, potential_group, subtrees):
 
 def tsv_to_membership(infile):
     """
-        obtain the hierarchical divisions that are present in a given tsv file for latter functions to assess
+        obtain the hierarchical divisions that are present in a given tsv file for later functions to assess
         Parameters
         ----------
         infile : string
@@ -152,6 +168,7 @@ def tsv_to_membership(infile):
                         break
                     else:
                         print("There is an error in your tsv file")
+                        # raise exception
                 else:
                     if leaf not in groups.keys():
                         groups[leaf] = [row[i]]
@@ -205,19 +222,29 @@ def tsv_to_membership(infile):
 
 
 def parse_tree(tree_file):
+
+    """
+        resolves potential polytomys in the supplied newick tree
+        Parameters
+        ------
+        tree_file: str
+            user supplied tree filename
+        Returns
+        ------
+        t: ete3 tree object
+            contains modified user tree
+    """
+
     # Load a tree structure from a newick file.
     t = Tree(tree_file)
     # Need this otherwise groups derived from the tree are inaccurate
     t.resolve_polytomy()
-    # Need to force root for consistency but should modify this behavior to support defined root
-    root = t.get_midpoint_outgroup()
-    # t.set_outgroup(root)
     return t
 
 
 def get_tree_groups(ete3_tree_obj):
     """
-        obtain the hierarchical divisions that are present in a given tree for latter functions to assess
+        obtain the hierarchical divisions that are present in a given tree for later functions to assess
         Parameters
         ----------
             ete3_tree_obj: ete3 tree object
@@ -228,11 +255,10 @@ def get_tree_groups(ete3_tree_obj):
                 Contains the group information with the leaves as keys and the list of groups as values
     """
     # initialize variables
-    level_rank = 0
     memberships = dict()
     group = 1
     # visit all nodes by depth from the root and generate a list of group memberships for each leaf
-    # a leaf is a part of the same membership as another leaf iff they share a common interior parental node
+    # a leaf is a part of the same membership as another leaf if they share a common interior parental node
     # the root of the tree is ignored in this calculation
     for node in ete3_tree_obj.iter_descendants("levelorder"):
         names = node.get_leaf_names()
@@ -245,7 +271,6 @@ def get_tree_groups(ete3_tree_obj):
             if n not in memberships:
                 memberships[n] = list()
             memberships[n].append(group)
-        level_rank += 1
         group += 1
     # obtain the number of subtrees that contain a leaf
     n_ranks = list()
@@ -255,15 +280,19 @@ def get_tree_groups(ete3_tree_obj):
     max_ranks = max(n_ranks)
     # converts the group identifiers so that the numbering restarts at each level
     for i in range(0, max_ranks):
+        # group numbering starts at one as zero groups are placeholders and do not signify a real group
         group = 1
         lookup = dict()
         for n in memberships:
             length = len(memberships[n])
             if i < length:
+                # obtain the old group numbering from the memberships dictionary
                 group_id = memberships[n][i]
                 if group_id not in lookup:
+                    # generate an entry in the lookup dictionary between the old and the new group numbers
                     lookup[group_id] = group
                     group += 1
+                # replace the old group name with the renumbered group name in the memberships dictionary
                 memberships[n][i] = lookup[group_id]
     # if the sample is a member of a smaller set of subtrees than the sample with the largest set of member subtrees
     # append zeros to the end of the list to make it the same size as the largest set of member subtrees
@@ -272,15 +301,13 @@ def get_tree_groups(ete3_tree_obj):
         if count_levels < max_ranks:
             for i in range(count_levels, max_ranks):
                 memberships[n].append(0)
-    # output the membership information in a tab delineated manner
-    """for n in memberships:
-        print("{}\t{}".format(n, "\t".join(str(v) for v in memberships[n])))"""
     return memberships
 
 
 def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info, min_parent_size):
     """
         main function for generating potential biohansel tiles from group and varient call information
+
         Parameters
         ----------
             nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info: str
@@ -297,15 +324,12 @@ def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_
         raise SystemExit(0)
     if group_info == "none":
         path = "tree"
-    if nwk_treefile == "none":
+    else:
         path = "groups"
     # hard coded size of positive and negative tiles surrounding SNP
     tile_size = 32
-    tile_size = tile_size - 1
     mid_point = int(tile_size / 2)
     leaves = []
-    # required spacing between at least two snps in the group support
-    # size_cutoff = 200000
     # test that files exist
     # obtain the dictionary of leaf subtree membership after pre-processing the raw Newick Tree to resolve polytomys
     if path == "tree":
@@ -318,7 +342,7 @@ def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_
         except parser.newick.NewickError:
             print(
                 f"There was an error in reading {nwk_treefile}.  "
-                f"Verify that the file exists and is in the correct format")
+                f"Verify that the file exists and is in the correct format for the ete3 python module")
             raise SystemExit(0)
     # if group information is provided as a tsv extract membership information
     if path == "groups":
@@ -351,13 +375,8 @@ def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_
         reader = vcfpy.Reader.from_path(vcf_file)
     except FileNotFoundError:
         print(
-            f"There was an error in reading {vcf_file}.  "
+            f"There was an error in reading {vcf_file} with vcfpy.  "
             f"Verify that the file exists")
-        raise SystemExit(0)
-    except vcfpy.exceptions.IncorrectVCFFormat:
-        print(
-            f"There was an error in reading {vcf_file}.  "
-            f"Verify that the file name is correct")
         raise SystemExit(0)
 
     if min_snps < 1:
@@ -690,7 +709,7 @@ def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_
                 last_group = len(current_ids[i-1][dropped.values[k, (i - 1)]])
                 this_group = len(current_ids[i][dropped.values[k, i]])
             if last_group - this_group < min_parent_size:
-                    biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
+                biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
             # NOTE: NEED TO ADD QC FLAG TO SCHEME ENTRIES
             # if that row is associated with group zero at column i just copy from left
             elif working_group == 0:
@@ -792,8 +811,14 @@ def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_
 
 
 def main():
-    # collect relevant user input and parse it into the appropriate variables
+    """
+    The main body of the code that calls all the functions required to generate the biohansel tiles
+
+    """
+    # double check if still needed
     global ref_seq
+
+    # collect relevant user input and parse it into the appropriate variables
     args = parse_args()
     nwk_treefile = args.in_nwk
     reference_fasta = args.reference
