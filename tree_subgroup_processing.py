@@ -386,8 +386,6 @@ def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_
         print("Minimum group size needs to be an integer greater than zero")
         raise SystemExit(0)
 
-    # Hardcoded header
-    header = ['#CHROM', 'POS', 'REF', 'ALT'] + reader.header.samples.names
     samples = reader.header.samples.names
     discr = np.setdiff1d(samples, leaves)
     if len(discr) != 0:
