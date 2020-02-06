@@ -1,3 +1,10 @@
+"""
+Describe module
+
+
+"""
+
+
 from ete3 import Tree
 from ete3 import parser
 from Bio import SeqIO
@@ -11,7 +18,14 @@ import re
 
 
 def parse_args():
-    """Parse the input arguments, use '-h' for help"""
+    """
+    Parse the input arguments, use '-h' for help
+
+        Returns
+        -------
+            parser_inner.parse_args()
+
+    """
     parser_inner = ArgumentParser(
         description='BIO_Hansel Scheme development')
     parser_inner.add_argument('--in_vcf', type=str, required=True, help='VCF File of SNPs')
@@ -22,6 +36,8 @@ def parse_args():
                               help="Number of cannonical SNPs required to define a group")
     parser_inner.add_argument('--min_members', type=int, required=False, default=5,
                               help="Minimum number of members to define a group")
+    parser_inner.add_argument('--min_parent', type=int, required=False, default=2,
+                              help="Minimum size difference between new group and parent group to be considered valid")
     parser_inner.add_argument('--group_info', type=str, required=False, default="none",
                               help="A tsv file that contains the leaf ids and group information,"
                                    " for specific formatting information please see the README")
@@ -31,6 +47,8 @@ def parse_args():
 def get_subtrees(tree_mem):
     """
        break the tree membership information into which subtrees of a given size are present
+
+       preparatory step for saving computational steps when comparing only group memberships of the same size
 
        Parameters
        ----------
@@ -52,7 +70,7 @@ def get_subtrees(tree_mem):
     for i in range(0, max_rank):
         # blank the dictionary for the current subtree
         subtree = dict()
-        # for each of the leaves in the tree membership dictionary rearange the information so that the key is the
+        # for each of the leaves in the tree membership dictionary rearrange the information so that the key is the
         # group_id and the value is a list of all the leaves that are in that subtree
         for key in tree_mem.keys():
             tree_id = tree_mem[key][i]
@@ -125,14 +143,16 @@ def search_st(ingroup, potential_rank, potential_group, subtrees):
 
 def tsv_to_membership(infile):
     """
-        obtain the hierarchical divisions that are present in a given tsv file for latter functions to assess
-        :param
-            infile: string
+        obtain the hierarchical divisions that are present in a given tsv file for later functions to assess
+        Parameters
+        ----------
+        infile : string
             indicates the file name of the group membership information
-        :return:
-            groups: dictionary
+        Returns
+        -------
+        groups : dictionary
             Contains the group information with the leaves as keys and the list of groups as values
-        """
+    """
     groups = dict()
     used = dict()
     with open(infile) as tsvfile:
@@ -148,6 +168,7 @@ def tsv_to_membership(infile):
                         break
                     else:
                         print("There is an error in your tsv file")
+                        # raise exception
                 else:
                     if leaf not in groups.keys():
                         groups[leaf] = [row[i]]
@@ -201,32 +222,43 @@ def tsv_to_membership(infile):
 
 
 def parse_tree(tree_file):
+
+    """
+        resolves potential polytomys in the supplied newick tree
+        Parameters
+        ------
+        tree_file: str
+            user supplied tree filename
+        Returns
+        ------
+        t: ete3 tree object
+            contains modified user tree
+    """
+
     # Load a tree structure from a newick file.
     t = Tree(tree_file)
     # Need this otherwise groups derived from the tree are inaccurate
     t.resolve_polytomy()
-    # Need to force root for consistency but should modify this behavior to support defined root
-    root = t.get_midpoint_outgroup()
-    # t.set_outgroup(root)
     return t
 
 
 def get_tree_groups(ete3_tree_obj):
     """
-    obtain the hierarchical divisions that are present in a given tree for latter functions to assess
-    :param
-        ete3_tree_obj: ete3 tree object
-        Takes an ete3 format tree for processing into groupings indicated by the tree structure
-    :return:
-        memberships: dictionary
-        Contains the group information with the leaves as keys and the list of groups as values
+        obtain the hierarchical divisions that are present in a given tree for later functions to assess
+        Parameters
+        ----------
+            ete3_tree_obj: ete3 tree object
+                Takes an ete3 format tree for processing into groupings indicated by the tree structure
+        Returns
+        -------
+            memberships: dictionary
+                Contains the group information with the leaves as keys and the list of groups as values
     """
     # initialize variables
-    level_rank = 0
     memberships = dict()
     group = 1
     # visit all nodes by depth from the root and generate a list of group memberships for each leaf
-    # a leaf is a part of the same membership as another leaf iff they share a common interior parental node
+    # a leaf is a part of the same membership as another leaf if they share a common interior parental node
     # the root of the tree is ignored in this calculation
     for node in ete3_tree_obj.iter_descendants("levelorder"):
         names = node.get_leaf_names()
@@ -239,7 +271,6 @@ def get_tree_groups(ete3_tree_obj):
             if n not in memberships:
                 memberships[n] = list()
             memberships[n].append(group)
-        level_rank += 1
         group += 1
     # obtain the number of subtrees that contain a leaf
     n_ranks = list()
@@ -249,15 +280,19 @@ def get_tree_groups(ete3_tree_obj):
     max_ranks = max(n_ranks)
     # converts the group identifiers so that the numbering restarts at each level
     for i in range(0, max_ranks):
+        # group numbering starts at one as zero groups are placeholders and do not signify a real group
         group = 1
         lookup = dict()
         for n in memberships:
             length = len(memberships[n])
             if i < length:
+                # obtain the old group numbering from the memberships dictionary
                 group_id = memberships[n][i]
                 if group_id not in lookup:
+                    # generate an entry in the lookup dictionary between the old and the new group numbers
                     lookup[group_id] = group
                     group += 1
+                # replace the old group name with the renumbered group name in the memberships dictionary
                 memberships[n][i] = lookup[group_id]
     # if the sample is a member of a smaller set of subtrees than the sample with the largest set of member subtrees
     # append zeros to the end of the list to make it the same size as the largest set of member subtrees
@@ -266,21 +301,17 @@ def get_tree_groups(ete3_tree_obj):
         if count_levels < max_ranks:
             for i in range(count_levels, max_ranks):
                 memberships[n].append(0)
-    # output the membership information in a tab delineated manner
-    """for n in memberships:
-        print("{}\t{}".format(n, "\t".join(str(v) for v in memberships[n])))"""
     return memberships
 
 
-def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info):
+def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info, min_parent_size):
     """
-    :param
-        nwk_treefile:
-        reference_fast:
-        vcf_file:
-        min_snps:
-        min_group_size:
-        group_info:
+        main function for generating potential biohansel tiles from group and varient call information
+
+        Parameters
+        ----------
+            nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info: str
+                user supplied input file names and settings obtained from the parse_args function
     """
     path = ""
     # double check that the user has input only one way to get group info
@@ -293,15 +324,12 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
         raise SystemExit(0)
     if group_info == "none":
         path = "tree"
-    if nwk_treefile == "none":
+    else:
         path = "groups"
     # hard coded size of positive and negative tiles surrounding SNP
     tile_size = 32
-    tile_size = tile_size - 1
     mid_point = int(tile_size / 2)
     leaves = []
-    # required spacing between at least two snps in the group support
-    # size_cutoff = 200000
     # test that files exist
     # obtain the dictionary of leaf subtree membership after pre-processing the raw Newick Tree to resolve polytomys
     if path == "tree":
@@ -314,7 +342,7 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
         except parser.newick.NewickError:
             print(
                 f"There was an error in reading {nwk_treefile}.  "
-                f"Verify that the file exists and is in the correct format")
+                f"Verify that the file exists and is in the correct format for the ete3 python module")
             raise SystemExit(0)
     # if group information is provided as a tsv extract membership information
     if path == "groups":
@@ -347,13 +375,8 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
         reader = vcfpy.Reader.from_path(vcf_file)
     except FileNotFoundError:
         print(
-            f"There was an error in reading {vcf_file}.  "
+            f"There was an error in reading {vcf_file} with vcfpy.  "
             f"Verify that the file exists")
-        raise SystemExit(0)
-    except vcfpy.exceptions.IncorrectVCFFormat:
-        print(
-            f"There was an error in reading {vcf_file}.  "
-            f"Verify that the file is in the correct format")
         raise SystemExit(0)
 
     if min_snps < 1:
@@ -363,8 +386,6 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
         print("Minimum group size needs to be an integer greater than zero")
         raise SystemExit(0)
 
-    # Hardcoded header
-    header = ['#CHROM', 'POS', 'REF', 'ALT'] + reader.header.samples.names
     samples = reader.header.samples.names
     discr = np.setdiff1d(samples, leaves)
     if len(discr) != 0:
@@ -377,122 +398,127 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
     number_groups = 0
     # print(subtrees)
     all_variable = []
-    for record in reader:
-        # skip over the metadata lines at the top of the file
-        if not record.is_snv():
-            continue
+    try:
+        for record in reader:
+            # skip over the metadata lines at the top of the file
+            if not record.is_snv():
+                continue
 
-        # pull the positional information and the reference value and all the alt values from the vcf file
-        line = [record.CHROM, record.POS, record.REF]
-        line += [alt.value for alt in record.ALT]
+            # pull the positional information and the reference value and all the alt values from the vcf file
+            line = [record.CHROM, record.POS, record.REF]
+            line += [alt.value for alt in record.ALT]
 
-        # skip any vcf calls that have multiple alternative alleles
-        if len(record.ALT) > 1:
-            continue
+            # skip any vcf calls that have multiple alternative alleles
+            if len(record.ALT) > 1:
+                continue
 
-        # initialize variables and pull the ref and alt SNPs
-        alt_base = record.ALT[0].value
-        ref_base = record.REF
-        position = record.POS
-        all_variable.append(position)
-        count_ref = 0
-        count_alt = 0
-        ref_group = list()
-        alt_group = list()
-        tracker = 0
+            # initialize variables and pull the ref and alt SNPs
+            alt_base = record.ALT[0].value
+            ref_base = record.REF
+            position = record.POS
+            all_variable.append(position)
+            count_ref = 0
+            count_alt = 0
+            ref_group = list()
+            alt_group = list()
+            tracker = 0
 
-        # go through the samples and divide them by alt vs ref bases
-        for call in record.calls:
-            state = int(call.data.get('GT'))
-            sample_name = samples[tracker]
-            if state == 0:
-                count_ref += 1
-                ref_group.append(sample_name)
-            elif state == 1:
-                count_alt += 1
-                alt_group.append(sample_name)
-            else:
-                print("there is a problem reading the state information")
-            tracker += 1
+            # go through the samples and divide them by alt vs ref bases
+            for call in record.calls:
+                state = int(call.data.get('GT'))
+                sample_name = samples[tracker]
+                if state == 0:
+                    count_ref += 1
+                    ref_group.append(sample_name)
+                elif state == 1:
+                    count_alt += 1
+                    alt_group.append(sample_name)
+                else:
+                    print("there is a problem reading the state information")
+                tracker += 1
 
-        # generate places to put group and rank information
-        valid_ranks = list()
-        valid_ranks_alt = list()
-        valid_groups = list()
-        valid_groups_alt = list()
-        conflict_positions = dict()
-        ref_candidate_partitions = dict()
-        alt_candidate_partitions = dict()
+            # generate places to put group and rank information
+            valid_ranks = list()
+            valid_ranks_alt = list()
+            valid_groups = list()
+            valid_groups_alt = list()
+            conflict_positions = dict()
+            ref_candidate_partitions = dict()
+            alt_candidate_partitions = dict()
 
-        # if there is variation at the snp location search to see if the partitioning suggested by the snp is
-        # one that is present in the provided tree
-        if count_ref >= 1 and count_alt >= 1:
-            if len(ref_group) in subtrees.keys():
-                valid_ranks, valid_groups = search_st(ref_group, valid_ranks, valid_groups, subtrees)
-            if len(valid_ranks) > 0:
-                for i in range(0, len(valid_ranks)):
-                    if valid_ranks[i] not in ref_candidate_partitions:
-                        ref_candidate_partitions[valid_ranks[i]] = list()
-                    if valid_groups[i] == 0:
-                        continue
-                    for item in ref_candidate_partitions[valid_ranks[i]]:
-                        if item["position"] == position:
-                            """print(f"Warning duplication of {position}")"""
-                    # if the partition is already supported add the information about that snp if not created it
-                    ref_candidate_partitions[valid_ranks[i]].append({"position": position, "ref_base": ref_base,
-                                                                     "alt_base": alt_base,
-                                                                     "ref_count": count_ref,
-                                                                     "alt_count": count_alt,
-                                                                     "positive_group": "ref",
-                                                                     "group_id": valid_groups[i],
-                                                                     "rank_id": valid_ranks[i],
-                                                                     "qc_warnings": []})
-            if len(alt_group) in subtrees.keys():
-                valid_ranks_alt, valid_groups_alt = search_st(alt_group, valid_ranks, valid_groups, subtrees)
-            if len(valid_ranks_alt) > 0:
-                for i in range(0, len(valid_ranks_alt)):
-                    if valid_ranks_alt[i] not in alt_candidate_partitions:
-                        alt_candidate_partitions[valid_ranks_alt[i]] = list()
-                    if valid_groups_alt[i] == 0:
-                        continue
-                    # get the tile start from the position and tile information
-                    start = position - 1 - mid_point
-                    alt_candidate_partitions[valid_ranks_alt[i]].append({"position": position,
-                                                                         "ref_base": ref_base,
+            # if there is variation at the snp location search to see if the partitioning suggested by the snp is
+            # one that is present in the provided tree
+            if count_ref >= 1 and count_alt >= 1:
+                if len(ref_group) in subtrees.keys():
+                    valid_ranks, valid_groups = search_st(ref_group, valid_ranks, valid_groups, subtrees)
+                if len(valid_ranks) > 0:
+                    for i in range(0, len(valid_ranks)):
+                        if valid_ranks[i] not in ref_candidate_partitions:
+                            ref_candidate_partitions[valid_ranks[i]] = list()
+                        if valid_groups[i] == 0:
+                            continue
+                        for item in ref_candidate_partitions[valid_ranks[i]]:
+                            if item["position"] == position:
+                                """print(f"Warning duplication of {position}")"""
+                        # if the partition is already supported add the information about that snp if not created it
+                        ref_candidate_partitions[valid_ranks[i]].append({"position": position, "ref_base": ref_base,
                                                                          "alt_base": alt_base,
                                                                          "ref_count": count_ref,
                                                                          "alt_count": count_alt,
-                                                                         "positive_group": "alt",
-                                                                         "group_id": valid_groups_alt[i],
-                                                                         "rank_id": valid_ranks_alt[i],
+                                                                         "positive_group": "ref",
+                                                                         "group_id": valid_groups[i],
+                                                                         "rank_id": valid_ranks[i],
                                                                          "qc_warnings": []})
-            positions = dict()
+                if len(alt_group) in subtrees.keys():
+                    valid_ranks_alt, valid_groups_alt = search_st(alt_group, valid_ranks, valid_groups, subtrees)
+                if len(valid_ranks_alt) > 0:
+                    for i in range(0, len(valid_ranks_alt)):
+                        if valid_ranks_alt[i] not in alt_candidate_partitions:
+                            alt_candidate_partitions[valid_ranks_alt[i]] = list()
+                        if valid_groups_alt[i] == 0:
+                            continue
+                        # get the tile start from the position and tile information
+                        start = position - 1 - mid_point
+                        alt_candidate_partitions[valid_ranks_alt[i]].append({"position": position,
+                                                                             "ref_base": ref_base,
+                                                                             "alt_base": alt_base,
+                                                                             "ref_count": count_ref,
+                                                                             "alt_count": count_alt,
+                                                                             "positive_group": "alt",
+                                                                             "group_id": valid_groups_alt[i],
+                                                                             "rank_id": valid_ranks_alt[i],
+                                                                             "qc_warnings": []})
+                positions = dict()
 
-            for rank in ref_candidate_partitions:
-                if rank not in scheme:
-                    scheme[rank] = dict()
-                for item in ref_candidate_partitions[rank]:
+                for rank in ref_candidate_partitions:
+                    if rank not in scheme:
+                        scheme[rank] = dict()
+                    for item in ref_candidate_partitions[rank]:
 
-                    # filter out groups which are too small
-                    if item['ref_count'] < min_group_size:
-                        continue
-                    if item['alt_count'] < min_group_size:
-                        continue
-                    if not item["group_id"] in scheme[rank]:
-                        scheme[rank][item["group_id"]] = []
-                    scheme[rank][item["group_id"]].append(item)
+                        # filter out groups which are too small
+                        if item['ref_count'] < min_group_size:
+                            continue
+                        if item['alt_count'] < min_group_size:
+                            continue
+                        if not item["group_id"] in scheme[rank]:
+                            scheme[rank][item["group_id"]] = []
+                        scheme[rank][item["group_id"]].append(item)
 
-            for rank in alt_candidate_partitions:
-                if rank not in scheme:
-                    scheme[rank] = dict()
-                for item in alt_candidate_partitions[rank]:
-                    # filter out groups which are too small
-                    if item['alt_count'] < min_group_size:
-                        continue
-                    if not item["group_id"] in scheme[rank]:
-                        scheme[rank][item["group_id"]] = []
-                    scheme[rank][item["group_id"]].append(item)
-
+                for rank in alt_candidate_partitions:
+                    if rank not in scheme:
+                        scheme[rank] = dict()
+                    for item in alt_candidate_partitions[rank]:
+                        # filter out groups which are too small
+                        if item['alt_count'] < min_group_size:
+                            continue
+                        if not item["group_id"] in scheme[rank]:
+                            scheme[rank][item["group_id"]] = []
+                        scheme[rank][item["group_id"]].append(item)
+    except vcfpy.exceptions.IncorrectVCFFormat:
+        print(
+            f"There was an error in reading {vcf_file}.  "
+            f"Verify that the file format is correct")
+        raise SystemExit(0)
     # filter out groups with less than minimum number of supporting snps
     required_tiles = []
     for rank in scheme:
@@ -521,8 +547,6 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                     scheme[rank][group_id].pop(i)
         scheme[rank] = valid
 
-    """ print(f"\n When the minimum group size is {min_group_size}, there are {number_snps} SNPs"
-          f" that support a total of {number_groups} groups")"""
     # sort the lists of both all the variable positions and the ones of interest for the tile selection
     all_variable.sort()
     required_tiles.sort()
@@ -654,7 +678,7 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
     biohansel_codes = dropped.copy()
     new_code = str()
     current_ids = dict()
-    for i in range(1, biohansel_codes.shape[1]):
+    for i in range(0, biohansel_codes.shape[1]):
         current_max = 1
         used = dict()
         current_ids[i] = dict()
@@ -663,18 +687,30 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                 current_ids[i][dropped.values[k, i]] = [k]
             else:
                 current_ids[i][dropped.values[k, i]].append(k)
-                    # this stores both the current group ids under consideration but also a list of all the rows that
-                    # have that id
+                # this stores both the current group ids under consideration but also a list of all the rows that
+                # have that id
+        if i == 0:
+            continue
         for k in range(0, biohansel_codes.shape[0]):
+            # if there was a non-zero value in the previous column build off of that node
             # go to every row cycle through ids,
             # skipping zero and identify which is connected to current line
             working_group = -1
             new_code = str()
-            for identifier in current_ids[i].keys():
-                if k in current_ids[i][identifier]:
-                    working_group = identifier
+            for thing in current_ids[i].keys():
+                if k in current_ids[i][thing]:
+                    working_group = thing
+            # if the new group is only N smaller than the previous group mask by copy from left
+            this_group = 0
+            last_group = min_parent_size
+            if i > 0:
+                last_group = len(current_ids[i-1][dropped.values[k, (i - 1)]])
+                this_group = len(current_ids[i][dropped.values[k, i]])
+            if last_group - this_group < min_parent_size:
+                biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
+            # NOTE: NEED TO ADD QC FLAG TO SCHEME ENTRIES
             # if that row is associated with group zero at column i just copy from left
-            if working_group == 0:
+            elif working_group == 0:
                 biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
             else:
                 # if the group has already been used just pull the information
@@ -690,25 +726,18 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                                 new_code = str(attempt)
                                 break
                     # if the new group only shaves off one member ignore it and coppy from the left
-                    elif i > 0:
-                        last_group = dropped.values[k, i - 1]
-                        this_group = dropped.values[k, i]
-                        print(f"last column{last_group}, this column{this_group}")
-                    # if there was a non-zero value in the previous column build off of that node
                     else:
                         if biohansel_codes.values[k, i - 1] in current_codes.keys():
                             current_max = max(current_codes[biohansel_codes.values[k, i - 1]]) + 1
+                        else:
+                            current_max = 1
                         if biohansel_codes.values[k, i - 1] not in current_codes.keys():
                             current_codes[biohansel_codes.values[k, i - 1]] = []
                         current_codes[biohansel_codes.values[k, i - 1]].append(current_max)
                         new_code = str(biohansel_codes.values[k, i - 1]) + "." + str(current_max)
                     biohansel_codes.values[k, i] = new_code
                     used[working_group] = new_code
-    """with pd.option_context('display.max_rows', None, 'display.max_columns',
-                           None):  # more options can be specified also
-        print(test)
-        print(dropped)
-        print(biohansel_codes)"""
+
     # for translating old column numbers to the new ones in the new matrix with dropped columns get the old indexs
     # and the indexes of the indexes is the new column number
     kept = n_unique[n_unique > 1].index
@@ -717,16 +746,17 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
     # print(biohansel_codes.shape)
     codes = open("codes.log", "w+")
     for i in range(0, len(leaves) - 1):
-        codes.write(f"{leaves[i]} : {biohansel_codes.values[i, -1]}\n")
+        codes.write(f"{biohansel_codes.index[i]} : {biohansel_codes.values[i, -1]}\n")
     codes.close()
     log = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.log", "w+")
     fasta_file = open(f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.fasta", "w+")
-    check = open("wtf.txt", "w+")
+    check = open("checking.txt", "w+")
     for i in range(0, biohansel_codes.shape[0]):
         check.write("{}\t{}".format(biohansel_codes.index.values[i],
                                     "\t".join(str(v) for v in biohansel_codes.values[i,])) + "\n")
 
     check.close()
+    first_instance = dict()
     for rank in scheme:
         # translate the rank into the position in the table that has all the undefined columns are dropped
         for i in range(0, dropped.shape[1]):
@@ -747,9 +777,11 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                     if str(test.values[row, rank]) == str(group_id):
                         row_id = row
                         break
-                    """else:
-                        print(f"{test.values[row, rank]} does not equal {int(group_id)}")"""
                 code = biohansel_codes.values[row_id, rank_id]
+                # mark the rank of first instance , if it shows up again it is a masked internal node and tiles
+                # should not be output
+                if code not in first_instance.keys():
+                    first_instance[code] = rank_id
             # if the information from the groups in already provided use the old group codes
             if path == "groups":
                 code = group_id
@@ -758,6 +790,10 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
                 # exclude the the entries that have qc problems
                 if len(scheme[rank][group_id][item]["qc_warnings"]) != 0:
                     continue
+                if rank_id != first_instance[code]:
+                    continue
+                if rank_id < first_instance[code]:
+                    print("There has been an error in logic")
                 # extract the required information from the entries that have good qc
                 position = scheme[rank][group_id][item]["position"]
                 pos_tile = scheme[rank][group_id][item]["positive_tile"]
@@ -773,9 +809,14 @@ def identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size
 
 
 def main():
-    # collect relevant user input and parse it into the appropriate variables
+    """
+    The main body of the code that calls all the functions required to generate the biohansel tiles
+
+    """
+    # double check if still needed
     global ref_seq
-    global memberships
+
+    # collect relevant user input and parse it into the appropriate variables
     args = parse_args()
     nwk_treefile = args.in_nwk
     reference_fasta = args.reference
@@ -783,7 +824,8 @@ def main():
     min_snps = args.min_snps
     min_group_size = args.min_members
     group_info = args.group_info
-    identifier(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info)
+    min_parent_size = args.min_parent
+    tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info, min_parent_size)
 
 # call main function
 
