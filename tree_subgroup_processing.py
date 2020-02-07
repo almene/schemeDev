@@ -1,9 +1,10 @@
 """
-Describe module
-
+Biohansel requres a strain specific fasta format scheme to be able to classify samples.
+Schemes exist for some common clonal pathogens but there are many untapped applications.
+This module includes functions to aid in the generation of k-mers linked to predefined groups
+to serve as the basis for automatic scheme development
 
 """
-
 
 from ete3 import Tree
 from ete3 import parser
@@ -152,32 +153,37 @@ def tsv_to_membership(infile):
         -------
         groups : dictionary
             Contains the group information with the leaves as keys and the list of groups as values
+
     """
     groups = dict()
     used = dict()
-    with open(infile) as tsvfile:
-        reader = csv.reader(tsvfile, delimiter="\t")
-        max_len = 0
-        for row in reader:
-            leaf = row[0]
-            if len(row) > max_len:
-                max_len = len(row)
-            for i in range(1, len(row)):
-                if row[i] == "":
-                    if i == len(row)-1:
-                        break
+    try:
+        with open(infile) as tsvfile:
+            reader = csv.reader(tsvfile, delimiter="\t")
+            max_len = 0
+            for row in reader:
+                leaf = row[0]
+                if len(row) > max_len:
+                    max_len = len(row)
+                for i in range(1, len(row)):
+                    if row[i] == "":
+                        if i == len(row)-1:
+                            break
+                        else:
+                            print("There is an error in your tsv file as there are empty internal columns")
+                            raise SystemExit(0)
                     else:
-                        print("There is an error in your tsv file")
-                        # raise exception
-                else:
-                    if leaf not in groups.keys():
-                        groups[leaf] = [row[i]]
-                    else:
-                        groups[leaf].append(row[i])
-                    if i not in used.keys():
-                        used[i] = [row[i]]
-                    else:
-                        used[i].append(row[i])
+                        if leaf not in groups.keys():
+                            groups[leaf] = [row[i]]
+                        else:
+                            groups[leaf].append(row[i])
+                        if i not in used.keys():
+                            used[i] = [row[i]]
+                        else:
+                            used[i].append(row[i])
+    except FileNotFoundError:
+        print("There was an error reading the tsv file.  Check the file name and try again")
+        raise SystemExit(0)
 
     # ensure that all values are the same length for later matrix creation
     for key in groups.keys():
@@ -312,6 +318,10 @@ def tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_
         ----------
             nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info: str
                 user supplied input file names and settings obtained from the parse_args function
+
+        Raises
+        ----------
+
     """
     path = ""
     # double check that the user has input only one way to get group info
