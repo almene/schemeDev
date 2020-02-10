@@ -30,10 +30,11 @@ def parse_args():
     parser_inner.add_argument('--in_vcf', type=str, required=True, help='VCF File of SNPs')
     parser_inner.add_argument('--in_nwk', type=str, required=False, default="none",
                               help='Newick Tree of strains')
+    parser_inner.add_argument('--group_info', type=str, required=False, default="none",
+                              help="A tsv file that contains the leaf ids and group information,"
+                                   " for specific formatting information please see the README")
     parser_inner.add_argument('--reference', type=str, required=True,
                               help='Reference fasta sequence from VCF')
-    parser_inner.add_argument('--outdir', type=str, required=False,
-                              help='Output Directory to put results')
     parser_inner.add_argument('--min_snps', type=int, required=False, default=2,
                               help="Number of cannonical SNPs required to define a group")
     parser_inner.add_argument('--min_members', type=int, required=False, default=5,
@@ -41,9 +42,12 @@ def parse_args():
     parser_inner.add_argument('--min_parent', type=int, required=False, default=2,
                               help="Minimum size difference between new "
                                    "group and parent group to be considered valid")
-    parser_inner.add_argument('--group_info', type=str, required=False, default="none",
-                              help="A tsv file that contains the leaf ids and group information,"
-                                   " for specific formatting information please see the README")
+    parser_inner.add_argument('--flanking', type=int, required=False, default=15,
+                              help="number of flanking positions on either side used in k-mer"
+                                   "generation")
+    parser_inner.add_argument('--outdir', type=str, required=False,
+                              help='Output Directory to put results')
+
     return parser_inner.parse_args()
 
 
@@ -87,7 +91,7 @@ def get_subtrees(tree_mem):
                 subtree[tree_id] = s_tree
         # add to the dictionary of subtrees with the size of the subtree as a key and the values are
         # tuples that contain a list of the leaves and the rank and group ids
-        for key in subtree.keys():
+        for key in subtree:
             size = len(subtree[key])
             if size not in subtree_sizes.keys():
                 subtree_sizes[size] = [(subtree[key], i, key)]
@@ -193,7 +197,7 @@ def tsv_to_membership(infile):
         print("There was an error reading the tsv file.  Check the file name and try again")
         raise SystemExit(0)
     # ensure that all values are the same length for later matrix creation
-    for key in groups.keys():
+    for key in groups:
         while len(groups[key]) < max_len:
             groups[key].append(0)
     # ensure that all entries are numbers and replace to unique numbers if not already
@@ -201,12 +205,15 @@ def tsv_to_membership(infile):
     for i in range(0, max_len):
         switch = dict()
         new = str()
-        for key in groups.keys():
+        for key in groups:
             checking = str(groups[key][i])
             if i > 0:
                 checking = str(groups[key][i - 1]) + "." + checking
-            # check to see if the value contains only the accepted characters
+            # check to see if the value contains only the accepted characters,
+            # if it contains illegal characters rename the groups
             if re.search(non_valid, checking):
+                print("provided groups contain invalid characters for biohansel codes.  "
+                      "New codes will be generated")
                 if checking not in switch.keys():
                     if i == 0:
                         for j in range(1, len(groups.keys())):
@@ -258,7 +265,7 @@ def get_tree_groups(ete3_tree_obj):
                  indicated by the tree structure
         Returns
         -------
-            memberships: dictionary
+            memberships: dict
                 Contains the group information with the leaves as keys
                  and the list of groups as values
     """
@@ -316,7 +323,7 @@ def get_tree_groups(ete3_tree_obj):
     return memberships
 
 
-def add_tiles(scheme, ref_seq, mid_point, conflict_positions):
+def add_tiles(scheme, ref_seq, flanking, conflict_positions):
     """
     using the information from the vcf file and the requerence sequence generate the positive and
     negative k-mers and add them to the scheme object
@@ -326,7 +333,7 @@ def add_tiles(scheme, ref_seq, mid_point, conflict_positions):
         storage location for the information needed to generate the biohansel scheme output
     ref_seq: seq
         contains the user supplied reference sequence
-    mid_point: int
+    flanking: int
         user defined number of bases flanking the SNP site
     conflict_positions: dict
         information regarding ambiguous sites in the genome
@@ -343,19 +350,19 @@ def add_tiles(scheme, ref_seq, mid_point, conflict_positions):
                 pos_tile = ""
                 neg_tile = ""
                 position = scheme[rank][g_id][item]["position"]
-                start = position - 1 - mid_point
+                start = position - 1 - flanking
                 # which is the positive tile is determined by if the ref or alt base defines
                 # the in-group
                 if scheme[rank][g_id][item]["positive_group"] == "ref":
                     pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] +\
-                        ref_seq[position:position + mid_point]
+                        ref_seq[position:position + flanking]
                     neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] +\
-                        ref_seq[position:position + mid_point]
+                        ref_seq[position:position + flanking]
                 elif scheme[rank][g_id][item]["positive_group"] == "alt":
                     pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] +\
-                        ref_seq[position:position + mid_point]
+                        ref_seq[position:position + flanking]
                     neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] +\
-                        ref_seq[position:position + mid_point]
+                        ref_seq[position:position + flanking]
                 else:
                     print("something went wrong")
 
@@ -383,23 +390,111 @@ def add_tiles(scheme, ref_seq, mid_point, conflict_positions):
     return scheme
 
 
-def tile_generator(
-        nwk_treefile, reference_fasta, vcf_file, min_snps: int, min_group_size: int,
-        group_info, min_parent_size):
+def filter_by_snps(scheme, min_snps):
     """
-        main function for generating potential biohansel tiles from group and
-        varient call information
+    Takes the current scheme and removes any entries that do not meet the minimum snp support
+    requirement.  Additionally it marks down the location of variable positions for
+    tile generation.
+    Parameters
+    ----------
+    scheme: dict
+        contains the current working scheme information
+    min_snps: int
+        user specified desired number of snps required for a group to be validly supported
+    Returns
+    -------
+    required_tiles: list
+        List of positions for snps that support a valid grouping
+    """
+    # initialize required values
+    required_tiles = list()
+    number_snps = 0
+    number_groups = 0
 
-        Parameters
-        ----------
-            nwk_treefile, reference_fasta, vcf_file, group_info: str
-                user supplied input file names obtained from the parse_args function
-            min_snps, min_group_size, min_parent_size : int
-                user supplied configuration settings from the parse_args function
+    # iterate through all of the pieces of the scheme
+    for rank in scheme:
+        valid = dict()
+        prev = []
+        for g_id in scheme[rank]:
+            # the number of snps that support a group, rank combination can be obtained from the
+            # length of the list that contains them.  It if is shorter than the user input cutoff
+            # that group, rank combination is not valid
+            if len(scheme[rank][g_id]) >= min_snps:
+                valid[g_id] = scheme[rank][g_id]
+                number_groups += 1
+                duplicates = []
+                for item in range(0, len(scheme[rank][g_id])):
+                    if not prev:
+                        prev = scheme[rank][g_id][item]["position"]
+                        required_tiles.append(scheme[rank][g_id][item]["position"])
+                        number_snps += 1
+                    else:
+                        # there are occasional duplication of group rank support, this allows for
+                        # the removal of the duplicate
+                        if prev == scheme[rank][g_id][item]["position"]:
+                            duplicates.append(item)
+                            continue
+                        prev = scheme[rank][g_id][item]["position"]
+                        required_tiles.append(scheme[rank][g_id][item]["position"])
+                        number_snps += 1
+                duplicates.sort(reverse=True)
+                for i in range(0, len(duplicates)):
+                    scheme[rank][g_id].pop(i)
+        scheme[rank] = valid
+    return required_tiles
 
-        Raises
-        ----------
 
+def alt_or_ref(record, samples: list):
+    """
+    takes in a single record in a vcf file and returns the sample names divided into two lists:
+    ones that have the reference snp state and ones that have the alternative snp state
+
+    Parameters
+    ----------
+    record
+        the record supplied by the vcf reader
+    samples: list
+        list of sample names
+    Returns
+    -------
+    ref_group, alt_group : list
+        lists of samples divided by ref or alt snp state
+    """
+    tracker = 0
+    ref_group = []
+    alt_group = []
+    for call in record.calls:
+        state = int(call.data.get('GT'))
+        sample_name = samples[tracker]
+        if state == 0:
+            ref_group.append(sample_name)
+        elif state == 1:
+            alt_group.append(sample_name)
+        else:
+            print("there is a problem reading the state information")
+            raise SystemExit(0)
+        tracker += 1
+    return ref_group, alt_group
+
+
+def path_check(group_info, nwk_treefile):
+    """
+    checks that the sourcing on the group information is present and clear then generates the group
+    information from the provided data
+    Parameters
+    ----------
+    group_info, nwk_treefile: str
+        one of the variables should include a file name from which the group information can be
+        obtained
+
+    Returns
+    -------
+    memberships: dict
+        Contains the group information with the leaves as keys and the list of groups as values
+    leaves: list
+        list of sample names
+    path: str
+        identifier for which input was supplied
     """
     # double check that the user has input only one way to get group info
     if group_info == "none" and nwk_treefile == "none":
@@ -413,9 +508,6 @@ def tile_generator(
         path = "tree"
     else:
         path = "groups"
-    # hard coded size of positive and negative tiles surrounding SNP
-    tile_size = 32
-    mid_point = int(tile_size / 2)
     leaves = []
     # test that files exist
     # obtain the dictionary of leaf subtree membership after pre-processing
@@ -438,7 +530,28 @@ def tile_generator(
     if path == "groups":
         memberships = tsv_to_membership(group_info)
         leaves = list(memberships.keys())
+    return memberships, leaves, path
 
+
+def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups):
+    """
+    main function for generating potential biohansel tiles from group and
+     variant call information
+
+    Parameters
+    ----------
+    reference_fasta, vcf_file: str
+        user supplied input file names obtained from the parse_args function
+    numerical_parameters: list
+        user supplied configuration settings from the parse_args function
+    groups: list
+        contains information of memberships, leaf names and information source
+    See Also
+    --------
+    get_tree_groups(), tsv_to_membership()
+    """
+    min_snps, min_group_size, min_parent_size, flanking = numerical_parameters
+    memberships, leaves, path = groups
     # process the memberships data to extract the subtree
     # information from the membership information
     subtrees = get_subtrees(memberships)
@@ -492,9 +605,6 @@ def tile_generator(
         print(f"The samples found in one of the files but not the other are : {discr}")
         raise SystemExit(0)
     scheme = dict()
-    number_snps = 0
-    number_groups = 0
-    # print(subtrees)
     all_variable = []
 
     for record in reader:
@@ -516,89 +626,67 @@ def tile_generator(
         ref_base = record.REF
         position = record.POS
         all_variable.append(position)
-        count_ref = 0
-        count_alt = 0
-        ref_group = list()
-        alt_group = list()
-        tracker = 0
 
         # go through the samples and divide them by alt vs ref bases
-        for call in record.calls:
-            state = int(call.data.get('GT'))
-            sample_name = samples[tracker]
-            if state == 0:
-                count_ref += 1
-                ref_group.append(sample_name)
-            elif state == 1:
-                count_alt += 1
-                alt_group.append(sample_name)
-            else:
-                print("there is a problem reading the state information")
-            tracker += 1
+        ref_group, alt_group = alt_or_ref(record, samples)
 
         # generate places to put group and rank information
         valid_ranks = list()
         valid_ranks_alt = list()
         valid_groups = list()
         valid_groups_alt = list()
-        ref_candidate_partitions = dict()
-        alt_candidate_partitions = dict()
+        ref_cand_part = dict()
+        alt_cand_part = dict()
 
         # if there is variation at the snp location search to see
         # if the partitioning suggested by the snp is
         # one that is present in the provided tree
-        if count_ref >= 1 and count_alt >= 1:
+        if len(ref_group) >= 1 and len(alt_group) >= 1:
             if len(ref_group) in subtrees.keys():
                 valid_ranks, valid_groups = search_st(ref_group, valid_ranks, valid_groups,
                                                       subtrees)
             if len(valid_ranks) < 1:
                 continue
             for i in range(0, len(valid_ranks)):
-                if valid_ranks[i] not in ref_candidate_partitions:
-                    ref_candidate_partitions[valid_ranks[i]] = list()
+                if valid_ranks[i] not in ref_cand_part:
+                    ref_cand_part[valid_ranks[i]] = list()
                 if valid_groups[i] == 0:
                     continue
-                for item in ref_candidate_partitions[valid_ranks[i]]:
-                    if item["position"] == position:
-                        """print(f"Warning duplication of {position}")"""
                 # if the partition is already supported add the information about that
                 # snp if not created it
-                ref_candidate_partitions[valid_ranks[i]].append({"position": position,
-                                                                 "ref_base": ref_base,
-                                                                 "alt_base": alt_base,
-                                                                 "ref_count": count_ref,
-                                                                 "alt_count": count_alt,
-                                                                 "positive_group": "ref",
-                                                                 "g_id": valid_groups[i],
-                                                                 "rank_id": valid_ranks[i],
-                                                                 "qc_warnings": []})
+                ref_cand_part[valid_ranks[i]].append({"position": position,
+                                                      "ref_base": ref_base,
+                                                      "alt_base": alt_base,
+                                                      "ref_count": len(ref_group),
+                                                      "alt_count": len(alt_group),
+                                                      "positive_group": "ref",
+                                                      "g_id": valid_groups[i],
+                                                      "rank_id": valid_ranks[i],
+                                                      "qc_warnings": []})
             if len(alt_group) in subtrees.keys():
                 valid_ranks_alt, valid_groups_alt = search_st(alt_group, valid_ranks, valid_groups,
                                                               subtrees)
             if len(valid_ranks_alt) > 0:
                 for i in range(0, len(valid_ranks_alt)):
-                    if valid_ranks_alt[i] not in alt_candidate_partitions:
-                        alt_candidate_partitions[valid_ranks_alt[i]] = list()
+                    if valid_ranks_alt[i] not in alt_cand_part:
+                        alt_cand_part[valid_ranks_alt[i]] = list()
                     if valid_groups_alt[i] == 0:
                         continue
                     # if the partition is already supported add the information about that snp if
                     # not created it
-                    alt_candidate_partitions[valid_ranks_alt[i]].append({"position": position,
-                                                                         "ref_base": ref_base,
-                                                                         "alt_base": alt_base,
-                                                                         "ref_count": count_ref,
-                                                                         "alt_count": count_alt,
-                                                                         "positive_group": "alt",
-                                                                         "g_id":
-                                                                             valid_groups_alt[i],
-                                                                         "rank_id": valid_ranks_alt[
-                                                                             i],
-                                                                         "qc_warnings": []})
-            for rank in ref_candidate_partitions:
+                    alt_cand_part[valid_ranks_alt[i]].append({"position": position,
+                                                              "ref_base": ref_base,
+                                                              "alt_base": alt_base,
+                                                              "ref_count": len(ref_group),
+                                                              "alt_count": len(alt_group),
+                                                              "positive_group": "alt",
+                                                              "g_id": valid_groups_alt[i],
+                                                              "rank_id": valid_ranks_alt[i],
+                                                              "qc_warnings": []})
+            for rank in ref_cand_part:
                 if rank not in scheme:
                     scheme[rank] = dict()
-                for item in ref_candidate_partitions[rank]:
-
+                for item in ref_cand_part[rank]:
                     # filter out groups which are too small
                     if item['ref_count'] < min_group_size:
                         continue
@@ -608,10 +696,10 @@ def tile_generator(
                         scheme[rank][item["g_id"]] = []
                     scheme[rank][item["g_id"]].append(item)
 
-            for rank in alt_candidate_partitions:
+            for rank in alt_cand_part:
                 if rank not in scheme:
                     scheme[rank] = dict()
-                for item in alt_candidate_partitions[rank]:
+                for item in alt_cand_part[rank]:
                     # filter out groups which are too small
                     if item['alt_count'] < min_group_size:
                         continue
@@ -620,31 +708,7 @@ def tile_generator(
                     scheme[rank][item["g_id"]].append(item)
 
     # filter out groups with less than minimum number of supporting snps
-    required_tiles = []
-    for rank in scheme:
-        valid = dict()
-        prev = []
-        for g_id in scheme[rank]:
-            if len(scheme[rank][g_id]) >= min_snps:
-                valid[g_id] = scheme[rank][g_id]
-                number_groups += 1
-                duplicates = []
-                for item in range(0, len(scheme[rank][g_id])):
-                    if not prev:
-                        prev = scheme[rank][g_id][item]["position"]
-                        required_tiles.append(scheme[rank][g_id][item]["position"])
-                        number_snps += 1
-                    else:
-                        if prev == scheme[rank][g_id][item]["position"]:
-                            duplicates.append(item)
-                            continue
-                        prev = scheme[rank][g_id][item]["position"]
-                        required_tiles.append(scheme[rank][g_id][item]["position"])
-                        number_snps += 1
-                duplicates.sort(reverse=True)
-                for i in range(0, len(duplicates)):
-                    scheme[rank][g_id].pop(i)
-        scheme[rank] = valid
+    required_tiles = filter_by_snps(scheme, min_snps)
 
     # sort the lists of both all the variable positions and the ones of
     # interest for the tile selection
@@ -654,20 +718,20 @@ def tile_generator(
     stored_place = 0
     conflict_positions = dict()
     for item in required_tiles:
-        if stored_place < mid_point + 1:
+        if stored_place < flanking + 1:
             start = 0
-        elif item - all_variable[stored_place] > mid_point:
+        elif item - all_variable[stored_place] > flanking:
             start = stored_place
         else:
-            start = stored_place - mid_point
+            start = stored_place - flanking
         for i in range(start, len(all_variable)):
             difference = item - all_variable[i]
-            if difference > mid_point:
+            if difference > flanking:
                 continue
-            if difference < (-1 * mid_point):
+            if difference < (-1 * flanking):
                 stored_place = i
                 break
-            if mid_point >= difference >= (-1 * mid_point):
+            if flanking >= difference >= (-1 * flanking):
                 if difference == 0:
                     continue
                 if item not in conflict_positions.keys():
@@ -677,7 +741,7 @@ def tile_generator(
             else:
                 print(f"logic error\t : {difference}")
     # using the conflict position information pull the appropriate tiles from the reference genome
-    scheme = add_tiles(scheme, ref_seq, mid_point, conflict_positions)
+    scheme = add_tiles(scheme, ref_seq, flanking, conflict_positions)
     # double check that degenerate bases haven't removed support for a group
     # and that all support snps are not from the same region
     for rank in scheme:
@@ -794,7 +858,7 @@ def tile_generator(
     check = open("checking.txt", "w+")
     for i in range(0, biohansel_codes.shape[0]):
         check.write("{}\t{}".format(biohansel_codes.index.values[i],
-                                    "\t".join(str(v) for v in biohansel_codes.values[i,])) + "\n")
+                                    "\t".join(str(v) for v in biohansel_codes.values[i, ])) + "\n")
 
     check.close()
     first_instance = dict()
@@ -852,16 +916,9 @@ def main():
 
     # collect relevant user input and parse it into the appropriate variables
     args = parse_args()
-    nwk_treefile = args.in_nwk
-    reference_fasta = args.reference
-    vcf_file = args.in_vcf
-    min_snps = args.min_snps
-    min_group_size = args.min_members
-    group_info = args.group_info
-    min_parent_size = args.min_parent
-    tile_generator(nwk_treefile, reference_fasta, vcf_file, min_snps, min_group_size, group_info,
-                   min_parent_size)
-
+    groups = path_check(args.group_info, args.in_nwk)
+    numerical_parameters = [args.min_snps, args.min_members, args.min_parent, args.flanking]
+    tile_generator(args.reference, args.in_vcf, numerical_parameters, groups)
 
 # call main function
 
