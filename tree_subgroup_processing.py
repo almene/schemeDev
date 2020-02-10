@@ -533,6 +533,50 @@ def path_check(group_info, nwk_treefile):
     return memberships, leaves, path
 
 
+def id_conflict(required_tiles, flanking, all_variable):
+    """
+    search for the positions of snps that collide with other snps in the user defined k-mer window
+    Parameters
+    ----------
+    required_tiles: list
+        position information of all snps that support groups
+    flanking: int
+        size of flanking sequence on either side of the snp
+    all_variable:list
+        position information of all variable sites in the vfc file
+    Returns
+    -------
+    conflict positions: dict
+        data frame that contains the variable site positions around a target snp
+    """
+    stored_place = 0
+    conflict_positions = dict()
+    for item in required_tiles:
+        if stored_place < flanking + 1:
+            start = 0
+        elif item - all_variable[stored_place] > flanking:
+            start = stored_place
+        else:
+            start = stored_place - flanking
+        for i in range(start, len(all_variable)):
+            difference = item - all_variable[i]
+            if difference > flanking:
+                continue
+            if difference < (-1 * flanking):
+                stored_place = i
+                break
+            if flanking >= difference >= (-1 * flanking):
+                if difference == 0:
+                    continue
+                if item not in conflict_positions.keys():
+                    conflict_positions[item] = [all_variable[i]]
+                else:
+                    conflict_positions[item].append(all_variable[i])
+            else:
+                print(f"logic error\t : {difference}")
+    return conflict_positions
+
+
 def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups):
     """
     main function for generating potential biohansel tiles from group and
@@ -715,31 +759,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups):
     all_variable.sort()
     required_tiles.sort()
     # to reduce calculations store the location of the last position checked for conflict
-    stored_place = 0
-    conflict_positions = dict()
-    for item in required_tiles:
-        if stored_place < flanking + 1:
-            start = 0
-        elif item - all_variable[stored_place] > flanking:
-            start = stored_place
-        else:
-            start = stored_place - flanking
-        for i in range(start, len(all_variable)):
-            difference = item - all_variable[i]
-            if difference > flanking:
-                continue
-            if difference < (-1 * flanking):
-                stored_place = i
-                break
-            if flanking >= difference >= (-1 * flanking):
-                if difference == 0:
-                    continue
-                if item not in conflict_positions.keys():
-                    conflict_positions[item] = [all_variable[i]]
-                else:
-                    conflict_positions[item].append(all_variable[i])
-            else:
-                print(f"logic error\t : {difference}")
+    conflict_positions = id_conflict(required_tiles, flanking, all_variable)
     # using the conflict position information pull the appropriate tiles from the reference genome
     scheme = add_tiles(scheme, ref_seq, flanking, conflict_positions)
     # double check that degenerate bases haven't removed support for a group
