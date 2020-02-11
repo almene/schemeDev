@@ -154,6 +154,50 @@ def search_st(ingroup: list, potential_rank: list, potential_group: list, subtre
     return potential_rank, potential_group
 
 
+def generate_new_codes(checking, switch, groups, used, iterators):
+    """
+
+    Parameters
+    ----------
+    checking: str
+        old code that contains invalid characters
+    switch: dict
+        information on which new assignments have already been made
+    groups: dict
+        new group information after relabeling to biohansel compliant codes
+    used: dict
+        information on which codes have previously been used
+    iterators: list
+        contains the loop index and key under consideration
+
+    Returns
+    -------
+
+    """
+    i = iterators[0]
+    key = iterators[1]
+    print("provided groups contain invalid characters for biohansel codes.  "
+          "New codes will be generated")
+    new = str()
+    if checking not in switch.keys():
+        if i == 0:
+            for j in range(1, len(groups.keys())):
+                if str(j) in used[i + 1]:
+                    continue
+                new = str(j)
+                break
+            switch[checking] = new
+        else:
+            for j in range(1, len(groups.keys())):
+                new = str(groups[key][i - 1]) + "." + str(j)
+                if new in used[i + 1]:
+                    continue
+                break
+            switch[checking] = new
+        used[i + 1].append(switch[checking])
+    groups[key][i] = switch[checking]
+
+
 def tsv_to_membership(infile):
     """
         obtain the hierarchical divisions that are present in a given
@@ -204,7 +248,7 @@ def tsv_to_membership(infile):
     non_valid = r'[^0-9/.]'
     for i in range(0, max_len):
         switch = dict()
-        new = str()
+
         for key in groups:
             checking = str(groups[key][i])
             if i > 0:
@@ -212,25 +256,8 @@ def tsv_to_membership(infile):
             # check to see if the value contains only the accepted characters,
             # if it contains illegal characters rename the groups
             if re.search(non_valid, checking):
-                print("provided groups contain invalid characters for biohansel codes.  "
-                      "New codes will be generated")
-                if checking not in switch.keys():
-                    if i == 0:
-                        for j in range(1, len(groups.keys())):
-                            if str(j) in used[i + 1]:
-                                continue
-                            new = str(j)
-                            break
-                        switch[checking] = new
-                    else:
-                        for j in range(1, len(groups.keys())):
-                            new = str(groups[key][i - 1]) + "." + str(j)
-                            if new in used[i + 1]:
-                                continue
-                            break
-                        switch[checking] = new
-                    used[i + 1].append(switch[checking])
-                groups[key][i] = switch[checking]
+                iterators = [i, key]
+                generate_new_codes(checking, switch, groups, used, iterators)
     return groups
 
 
@@ -260,14 +287,12 @@ def get_tree_groups(ete3_tree_obj):
         given tree for later functions to assess
         Parameters
         ----------
-            ete3_tree_obj: ete3 tree object
-                Takes an ete3 format tree for processing into groupings
-                 indicated by the tree structure
+        ete3_tree_obj: ete3 tree object
+            Takes an ete3 format tree for processing into groupings indicated by the tree structure
         Returns
         -------
-            memberships: dict
-                Contains the group information with the leaves as keys
-                 and the list of groups as values
+        memberships: dict
+            Contains the group information with the leaves as keys and the list of groups as values
     """
     # initialize variables
     memberships = dict()
@@ -323,6 +348,55 @@ def get_tree_groups(ete3_tree_obj):
     return memberships
 
 
+def mask_unsupported(memberships, scheme):
+    """
+
+    Parameters
+    ----------
+    memberships: dict
+        Contains the group information with the leaves as keys and the list of groups as values
+    scheme: dict
+        storage location for the information needed to generate the biohansel scheme output
+
+    """
+    for sample in memberships:
+        hierarchy = memberships[sample]
+        for i in range(0, len(hierarchy)):
+            if i not in scheme:
+                hierarchy[i] = 0
+            elif not hierarchy[i] in scheme[i]:
+                hierarchy[i] = 0
+
+
+def replace_conflict(conflict, start, scheme, scheme_pieces):
+    """
+
+    Parameters
+    ----------
+    conflict, start: int
+        genome positions relevant to ambiguous k-mer generation
+    scheme: dict
+        storage location for the information needed to generate the biohansel scheme output
+    scheme_pieces: list
+        contains the keys required to navigate to the appropriate location in the scheme
+
+    """
+    rank = scheme_pieces[0]
+    g_id = scheme_pieces[1]
+    item = scheme_pieces[2]
+    index = conflict - start - 1
+
+    p_substring = scheme[rank][g_id][item]["positive_tile"][:index + 1]
+    n_substring = scheme[rank][g_id][item]["negative_tile"][:index + 1]
+    p_replace = scheme[rank][g_id][item]["positive_tile"][:index] + "N"
+    n_replace = (scheme[rank][g_id][item]["negative_tile"][:index] + "N")
+
+    scheme[rank][g_id][item]["positive_tile"] = \
+        scheme[rank][g_id][item]["positive_tile"].replace(p_substring, p_replace, 1)
+    scheme[rank][g_id][item]["negative_tile"] = \
+        scheme[rank][g_id][item]["negative_tile"].replace(n_substring, n_replace, 1)
+
+
 def add_tiles(scheme, ref_seq, flanking, conflict_positions):
     """
     using the information from the vcf file and the requerence sequence generate the positive and
@@ -371,19 +445,8 @@ def add_tiles(scheme, ref_seq, flanking, conflict_positions):
                 # if position has conflicts add degenerate bases
                 if position in conflict_positions.keys():
                     for conflict in conflict_positions[position]:
-                        index = conflict - start - 1
-
-                        p_substring = scheme[rank][g_id][item]["positive_tile"][:index + 1]
-                        n_substring = scheme[rank][g_id][item]["negative_tile"][:index + 1]
-                        p_replace = scheme[rank][g_id][item]["positive_tile"][:index] + "N"
-                        n_replace = (scheme[rank][g_id][item]["negative_tile"][:index] + "N")
-
-                        scheme[rank][g_id][item]["positive_tile"] = \
-                            scheme[rank][g_id][item]["positive_tile"]. \
-                            replace(p_substring, p_replace, 1)
-                        scheme[rank][g_id][item]["negative_tile"] = \
-                            scheme[rank][g_id][item]["negative_tile"]. \
-                            replace(n_substring, n_replace, 1)
+                        scheme_pieces = [rank, g_id, item]
+                        replace_conflict(conflict, start, scheme, scheme_pieces)
                     if len(conflict_positions[position]) >= 1:
                         scheme[rank][g_id][item]["qc_warnings"].append(
                             "One or more degenerate bases")
@@ -533,7 +596,7 @@ def path_check(group_info, nwk_treefile):
     return memberships, leaves, path
 
 
-def id_conflict(required_tiles, flanking, all_variable):
+def id_conflict(required_tiles, flanking, all_variable: list):
     """
     search for the positions of snps that collide with other snps in the user defined k-mer window
     Parameters
@@ -784,14 +847,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups):
                     stripped_pos.append(scheme[rank][g_id][item]["position"])
 
     # mask unsupported groups with zeros
-    for sample in memberships:
-        hierarchy = memberships[sample]
-        for i in range(0, len(hierarchy)):
-            if i not in scheme:
-                hierarchy[i] = 0
-            elif not hierarchy[i] in scheme[i]:
-                hierarchy[i] = 0
-    # mask unsupported groups with zeros
+    mask_unsupported(memberships, scheme)
     codes_start = pd.DataFrame(memberships, dtype=object)
     codes_start = codes_start.T
 
@@ -806,7 +862,6 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups):
     biohansel_codes = dropped.copy()
     current_ids = dict()
     for i in range(0, biohansel_codes.shape[1]):
-        current_max = 1
         used = dict()
         current_ids[i] = dict()
         for k in range(0, biohansel_codes.shape[0]):
@@ -835,7 +890,6 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups):
                 this_group = len(current_ids[i][dropped.values[k, i]])
             if last_group - this_group < min_parent_size:
                 biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
-            # NOTE: NEED TO ADD QC FLAG TO SCHEME ENTRIES
             # if that row is associated with group zero at column i just copy from left
             elif working_group == 0:
                 biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
@@ -905,7 +959,10 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups):
             # if the information from the groups in already provided use the old group codes
             if path == "groups":
                 code = g_id
-
+                # mark the rank of first instance , if it shows up again it
+                # is a masked internal node and tiles should not be output
+                if code not in first_instance.keys():
+                    first_instance[code] = rank_id
             for item in range(0, len(scheme[rank][g_id])):
                 # exclude the the entries that have qc problems
                 if len(scheme[rank][g_id][item]["qc_warnings"]) != 0:
