@@ -45,7 +45,7 @@ def parse_args():
     parser_inner.add_argument('--flanking', type=int, required=False, default=15,
                               help="number of flanking positions on either side used in k-mer"
                                    "generation")
-    parser_inner.add_argument('--outdir', type=str, required=False,
+    parser_inner.add_argument('--outdir', type=str, required=False, default=os.getcwd(),
                               help='Output Directory to put results')
 
     return parser_inner.parse_args()
@@ -720,25 +720,20 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         # skip over the metadata lines at the top of the file
         if not record.is_snv():
             continue
-
         # pull the positional information and the reference
         # value and all the alt values from the vcf file
         line = [record.CHROM, record.POS, record.REF]
         line += [alt.value for alt in record.ALT]
-
         # skip any vcf calls that have multiple alternative alleles
         if len(record.ALT) > 1:
             continue
-
         # initialize variables and pull the ref and alt SNPs
         alt_base = record.ALT[0].value
         ref_base = record.REF
         position = record.POS
         all_variable.append(position)
-
         # go through the samples and divide them by alt vs ref bases
         ref_group, alt_group = alt_or_ref(record, samples)
-
         # generate places to put group and rank information
         valid_ranks = list()
         valid_ranks_alt = list()
@@ -746,7 +741,6 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         valid_groups_alt = list()
         ref_cand_part = dict()
         alt_cand_part = dict()
-
         # if there is variation at the snp location search to see
         # if the partitioning suggested by the snp is
         # one that is present in the provided tree
@@ -804,7 +798,6 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                     if not item["g_id"] in scheme[rank]:
                         scheme[rank][item["g_id"]] = []
                     scheme[rank][item["g_id"]].append(item)
-
             for rank in alt_cand_part:
                 if rank not in scheme:
                     scheme[rank] = dict()
@@ -815,16 +808,22 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                     if not item["g_id"] in scheme[rank]:
                         scheme[rank][item["g_id"]] = []
                     scheme[rank][item["g_id"]].append(item)
-
+    print("scheme prior to filter_by_snps")
+    print(scheme)
     # filter out groups with less than minimum number of supporting snps
     required_tiles = filter_by_snps(scheme, min_snps)
-
     # sort the lists of both all the variable positions and the ones of
     # interest for the tile selection
     all_variable.sort()
     required_tiles.sort()
     # to reduce calculations store the location of the last position checked for conflict
+    print("prior to id_conflicts")
+    print(required_tiles)
+    print(flanking)
+    print(all_variable)
     conflict_positions = id_conflict(required_tiles, flanking, all_variable)
+    print("after id_conflicts")
+    print(conflict_positions)
     # using the conflict position information pull the appropriate tiles from the reference genome
     scheme = add_tiles(scheme, ref_seq, flanking, conflict_positions)
     # double check that degenerate bases haven't removed support for a group
