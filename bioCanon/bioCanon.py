@@ -23,7 +23,6 @@ def parse_args():
         Returns
         -------
             parser_inner.parse_args()
-
     """
     parser_inner = ArgumentParser(
         description='BIO_Hansel Scheme development')
@@ -47,16 +46,13 @@ def parse_args():
                                    "generation")
     parser_inner.add_argument('--outdir', type=str, required=False, default=os.getcwd(),
                               help='Output Directory to put results')
-
     return parser_inner.parse_args()
 
 
 def get_subtrees(tree_mem):
     """
        break the tree membership information into which subtrees of a given size are present
-
-       preparatory step for saving computational steps when
-       comparing only group memberships of the same size
+       preparatory step for saving computational steps
 
        Parameters
        ----------
@@ -68,7 +64,6 @@ def get_subtrees(tree_mem):
        subtree_sizes : dictionary
             contains the subtree information, keys represent the size of the sub tree,
             values are a tuple of leaf names, rank_id, g_id
-
        """
     # obtain the maximum rank size
     keys = list(tree_mem.keys())
@@ -105,7 +100,6 @@ def get_subtrees(tree_mem):
 def search_st(ingroup: list, potential_rank: list, potential_group: list, subtrees):
     """
        given the membership of the partition dictated by a snp, what subtree has that membership
-
        Parameters
        ----------
         ingroup : list
@@ -125,7 +119,6 @@ def search_st(ingroup: list, potential_rank: list, potential_group: list, subtre
         potential_group : list
             Currently identified potential subtree group ids that might
             be supported by the partition
-
        """
     # extract the size of the snp sharing group
     part_size = len(ingroup)
@@ -156,7 +149,7 @@ def search_st(ingroup: list, potential_rank: list, potential_group: list, subtre
 
 def generate_new_codes(checking, switch, groups, used, iterators: list):
     """
-
+    if supplied group codes are not biohansel compatible generate new ones
     Parameters
     ----------
     checking: str
@@ -169,10 +162,6 @@ def generate_new_codes(checking, switch, groups, used, iterators: list):
         information on which codes have previously been used
     iterators: list
         contains the loop index and key under consideration
-
-    Returns
-    -------
-
     """
     i = iterators[0]
     key = iterators[1]
@@ -208,7 +197,6 @@ def tsv_to_membership(infile):
         -------
         groups : dictionary
             Contains the group information with the leaves as keys and the list of groups as values
-
     """
     groups = dict()
     used = dict()
@@ -275,7 +263,6 @@ def parse_tree(tree_file):
         tree: ete3 tree object
             contains modified user tree
     """
-
     # Load a tree structure from a newick file.
     tree = Tree(tree_file)
     # Need this otherwise groups derived from the tree are inaccurate
@@ -351,14 +338,13 @@ def get_tree_groups(ete3_tree_obj):
 
 def mask_unsupported(memberships, scheme):
     """
-
+    replace unsupported group identifiers with zeros
     Parameters
     ----------
     memberships: dict
         Contains the group information with the leaves as keys and the list of groups as values
     scheme: dict
         storage location for the information needed to generate the biohansel scheme output
-
     """
     for sample in memberships:
         hierarchy = memberships[sample]
@@ -371,7 +357,7 @@ def mask_unsupported(memberships, scheme):
 
 def replace_conflict(conflict, start, scheme, scheme_pieces: list):
     """
-
+    change ambiguous positions to Ns in the k-mers
     Parameters
     ----------
     conflict, start: int
@@ -429,14 +415,14 @@ def add_tiles(scheme, ref_seq, flanking, conflict_positions):
                 # which is the positive tile is determined by if the ref or alt base defines
                 # the in-group
                 if scheme[rank][g_id][item]["positive_group"] == "ref":
-                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] + \
+                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] +\
                                ref_seq[position:position + flanking]
-                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] + \
+                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] +\
                                ref_seq[position:position + flanking]
                 elif scheme[rank][g_id][item]["positive_group"] == "alt":
-                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] + \
+                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] +\
                                ref_seq[position:position + flanking]
-                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] + \
+                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] +\
                                ref_seq[position:position + flanking]
                 else:
                     print("something went wrong")
@@ -512,7 +498,6 @@ def alt_or_ref(record, samples: list):
     """
     takes in a single record in a vcf file and returns the sample names divided into two lists:
     ones that have the reference snp state and ones that have the alternative snp state
-
     Parameters
     ----------
     record
@@ -642,6 +627,18 @@ def id_conflict(required_tiles, flanking, all_variable: list):
 
 
 def make_biohansel_codes(biohansel_codes, dropped, min_parent_size):
+    """
+    generate hierarchical codes for the groups identified
+    Parameters
+    ----------
+    biohansel_codes : pandas data frame
+        starts with the memberships and is then altered throughout the function into biohansel
+        compatible group codes
+    dropped : pandas data frame
+        contains membership information excluding empty columns
+    min_parent_size: int
+        user defined requirement for differnce between parent node and child node size
+    """
     current_codes = dict()
     current_ids = dict()
     for i in range(0, biohansel_codes.shape[1]):
@@ -704,9 +701,7 @@ def make_biohansel_codes(biohansel_codes, dropped, min_parent_size):
 
 def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outdir):
     """
-    main function for generating potential biohansel tiles from group and
-     variant call information
-
+    main function for generating potential biohansel tiles from group and variant call information
     Parameters
     ----------
     reference_fasta, vcf_file: str
@@ -992,14 +987,11 @@ def main():
     The main body of the code that calls all the functions required to generate the biohansel tiles
 
     """
-
     # collect relevant user input and parse it into the appropriate variables
     args = parse_args()
     groups = path_check(args.group_info, args.in_nwk)
     numerical_parameters = [args.min_snps, args.min_members, args.min_parent, args.flanking]
     tile_generator(args.reference, args.in_vcf, numerical_parameters, groups, args.outdir)
-
-
 # call main function
 
 
