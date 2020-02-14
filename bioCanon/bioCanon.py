@@ -176,8 +176,6 @@ def generate_new_codes(checking, switch, groups, used, iterators: list):
     """
     i = iterators[0]
     key = iterators[1]
-    print("provided groups contain invalid characters for biohansel codes.  "
-          "New codes will be generated")
     new = str()
     if checking not in switch.keys():
         if i == 0:
@@ -246,9 +244,9 @@ def tsv_to_membership(infile):
             groups[key].append(0)
     # ensure that all entries are numbers and replace to unique numbers if not already
     non_valid = r'[^0-9/.]'
+    warning = 0
     for i in range(0, max_len):
         switch = dict()
-
         for key in groups:
             checking = str(groups[key][i])
             if i > 0:
@@ -256,6 +254,10 @@ def tsv_to_membership(infile):
             # check to see if the value contains only the accepted characters,
             # if it contains illegal characters rename the groups
             if re.search(non_valid, checking):
+                if warning == 0:
+                    print("provided groups contain invalid characters for biohansel codes."
+                          "New codes will be generated")
+                    warning = 1
                 iterators = [i, key]
                 generate_new_codes(checking, switch, groups, used, iterators)
     return groups
@@ -302,7 +304,6 @@ def get_tree_groups(ete3_tree_obj):
     # interior parental node the root of the tree is ignored in this calculation
     for node in ete3_tree_obj.iter_descendants("levelorder"):
         names = node.get_leaf_names()
-        # print(names)
         if node.dist < 0:
             node.dist = 0
         for sample in names:
@@ -428,15 +429,15 @@ def add_tiles(scheme, ref_seq, flanking, conflict_positions):
                 # which is the positive tile is determined by if the ref or alt base defines
                 # the in-group
                 if scheme[rank][g_id][item]["positive_group"] == "ref":
-                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] +\
-                        ref_seq[position:position + flanking]
-                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] +\
-                        ref_seq[position:position + flanking]
+                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] + \
+                               ref_seq[position:position + flanking]
+                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] + \
+                               ref_seq[position:position + flanking]
                 elif scheme[rank][g_id][item]["positive_group"] == "alt":
-                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] +\
-                        ref_seq[position:position + flanking]
-                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] +\
-                        ref_seq[position:position + flanking]
+                    pos_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["alt_base"] + \
+                               ref_seq[position:position + flanking]
+                    neg_tile = ref_seq[start:position - 1] + scheme[rank][g_id][item]["ref_base"] + \
+                               ref_seq[position:position + flanking]
                 else:
                     print("something went wrong")
 
@@ -640,6 +641,67 @@ def id_conflict(required_tiles, flanking, all_variable: list):
     return conflict_positions
 
 
+def make_biohansel_codes(biohansel_codes, dropped, min_parent_size):
+    current_codes = dict()
+    current_ids = dict()
+    for i in range(0, biohansel_codes.shape[1]):
+        used = dict()
+        current_ids[i] = dict()
+        for k in range(0, biohansel_codes.shape[0]):
+            if dropped.values[k, i] not in current_ids[i].keys():
+                current_ids[i][dropped.values[k, i]] = [k]
+            else:
+                current_ids[i][dropped.values[k, i]].append(k)
+                # this stores both the current group ids under consideration but also a
+                # list of all the rows that have that id
+        if i == 0:
+            continue
+        for k in range(0, biohansel_codes.shape[0]):
+            # if there was a non-zero value in the previous column build off of that node
+            # go to every row cycle through ids,
+            # skipping zero and identify which is connected to current line
+            working_group = -1
+            new_code = str()
+            for thing in current_ids[i].keys():
+                if k in current_ids[i][thing]:
+                    working_group = thing
+            # if the new group is only sample smaller than the previous group mask by copy from left
+            this_group = 0
+            last_group = min_parent_size
+            if i > 0:
+                last_group = len(current_ids[i - 1][dropped.values[k, (i - 1)]])
+                this_group = len(current_ids[i][dropped.values[k, i]])
+            if last_group - this_group < min_parent_size:
+                biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
+            # if that row is associated with group zero at column i just copy from left
+            elif working_group == 0:
+                biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
+            else:
+                # if the group has already been used just pull the information
+                if working_group in used.keys():
+                    biohansel_codes.values[k, i] = used[working_group]
+                else:
+                    # if the value in the previous row is a zero start a new clade from the root
+                    if biohansel_codes.values[k, i - 1] == 0:
+                        for attempt in range(1, biohansel_codes.shape[0]):
+                            if attempt in current_codes.keys():
+                                continue
+                            new_code = str(attempt)
+                            break
+                    # if the new group only shaves off one member ignore it and copy from the left
+                    else:
+                        if biohansel_codes.values[k, i - 1] in current_codes.keys():
+                            current_max = max(current_codes[biohansel_codes.values[k, i - 1]]) + 1
+                        else:
+                            current_max = 1
+                        if biohansel_codes.values[k, i - 1] not in current_codes.keys():
+                            current_codes[biohansel_codes.values[k, i - 1]] = []
+                        current_codes[biohansel_codes.values[k, i - 1]].append(current_max)
+                        new_code = str(biohansel_codes.values[k, i - 1]) + "." + str(current_max)
+                    biohansel_codes.values[k, i] = new_code
+                    used[working_group] = new_code
+
+
 def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outdir):
     """
     main function for generating potential biohansel tiles from group and
@@ -808,8 +870,6 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                     if not item["g_id"] in scheme[rank]:
                         scheme[rank][item["g_id"]] = []
                     scheme[rank][item["g_id"]].append(item)
-    print("scheme prior to filter_by_snps")
-    print(scheme)
     # filter out groups with less than minimum number of supporting snps
     required_tiles = filter_by_snps(scheme, min_snps)
     # sort the lists of both all the variable positions and the ones of
@@ -817,13 +877,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     all_variable.sort()
     required_tiles.sort()
     # to reduce calculations store the location of the last position checked for conflict
-    print("prior to id_conflicts")
-    print(required_tiles)
-    print(flanking)
-    print(all_variable)
     conflict_positions = id_conflict(required_tiles, flanking, all_variable)
-    print("after id_conflicts")
-    print(conflict_positions)
     # using the conflict position information pull the appropriate tiles from the reference genome
     scheme = add_tiles(scheme, ref_seq, flanking, conflict_positions)
     # double check that degenerate bases haven't removed support for a group
@@ -859,65 +913,8 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
 
     # make a vector with all the number of groups in each column
     n_unique = dropped.apply(pd.Series.nunique)
-    current_codes = dict()
     biohansel_codes = dropped.copy()
-    current_ids = dict()
-    for i in range(0, biohansel_codes.shape[1]):
-        used = dict()
-        current_ids[i] = dict()
-        for k in range(0, biohansel_codes.shape[0]):
-            if dropped.values[k, i] not in current_ids[i].keys():
-                current_ids[i][dropped.values[k, i]] = [k]
-            else:
-                current_ids[i][dropped.values[k, i]].append(k)
-                # this stores both the current group ids under consideration but also a
-                # list of all the rows that have that id
-        if i == 0:
-            continue
-        for k in range(0, biohansel_codes.shape[0]):
-            # if there was a non-zero value in the previous column build off of that node
-            # go to every row cycle through ids,
-            # skipping zero and identify which is connected to current line
-            working_group = -1
-            new_code = str()
-            for thing in current_ids[i].keys():
-                if k in current_ids[i][thing]:
-                    working_group = thing
-            # if the new group is only sample smaller than the previous group mask by copy from left
-            this_group = 0
-            last_group = min_parent_size
-            if i > 0:
-                last_group = len(current_ids[i - 1][dropped.values[k, (i - 1)]])
-                this_group = len(current_ids[i][dropped.values[k, i]])
-            if last_group - this_group < min_parent_size:
-                biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
-            # if that row is associated with group zero at column i just copy from left
-            elif working_group == 0:
-                biohansel_codes.values[k, i] = biohansel_codes.values[k, i - 1]
-            else:
-                # if the group has already been used just pull the information
-                if working_group in used.keys():
-                    biohansel_codes.values[k, i] = used[working_group]
-                else:
-                    # if the value in the previous row is a zero start a new clade from the root
-                    if biohansel_codes.values[k, i - 1] == 0:
-                        for attempt in range(1, biohansel_codes.shape[0]):
-                            if attempt in current_codes.keys():
-                                continue
-                            new_code = str(attempt)
-                            break
-                    # if the new group only shaves off one member ignore it and copy from the left
-                    else:
-                        if biohansel_codes.values[k, i - 1] in current_codes.keys():
-                            current_max = max(current_codes[biohansel_codes.values[k, i - 1]]) + 1
-                        else:
-                            current_max = 1
-                        if biohansel_codes.values[k, i - 1] not in current_codes.keys():
-                            current_codes[biohansel_codes.values[k, i - 1]] = []
-                        current_codes[biohansel_codes.values[k, i - 1]].append(current_max)
-                        new_code = str(biohansel_codes.values[k, i - 1]) + "." + str(current_max)
-                    biohansel_codes.values[k, i] = new_code
-                    used[working_group] = new_code
+    make_biohansel_codes(biohansel_codes, dropped, min_parent_size)
 
     # for translating old column numbers to the new ones in the new matrix with dropped
     # columns get the old indexes and the indexes of the indexes is the new column number
@@ -931,14 +928,14 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     for i in range(0, len(leaves) - 1):
         codes.write(f"{biohansel_codes.index[i]} : {biohansel_codes.values[i, -1]}\n")
     codes.close()
-    log = open(os.path.join(out_path, f"{vcf_file}S{min_snps}G{min_group_size}_biohansel.log"),
+    log = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}_biohansel.log"),
                "w+")
-    fasta_file = open(os.path.join(out_path, f"{vcf_file}S{min_snps}G{min_group_size}"
+    fasta_file = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}"
                                              f"_biohansel.fasta"), "w+")
     check = open(os.path.join(out_path, f"checking.txt"), "w+")
     for i in range(0, biohansel_codes.shape[0]):
         check.write("{}\t{}".format(biohansel_codes.index.values[i],
-                                    "\t".join(str(v) for v in biohansel_codes.values[i, ])) + "\n")
+                                    "\t".join(str(v) for v in biohansel_codes.values[i,])) + "\n")
     check.close()
     first_instance = dict()
     for rank in scheme:
@@ -1001,6 +998,7 @@ def main():
     groups = path_check(args.group_info, args.in_nwk)
     numerical_parameters = [args.min_snps, args.min_members, args.min_parent, args.flanking]
     tile_generator(args.reference, args.in_vcf, numerical_parameters, groups, args.outdir)
+
 
 # call main function
 

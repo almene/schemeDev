@@ -1,4 +1,3 @@
-# id_conflict(required_tiles, flanking, all_variable: list):
 from bioCanon import bioCanon
 
 
