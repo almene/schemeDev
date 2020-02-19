@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 
 
 def test_id_conflict():
@@ -12,6 +12,6 @@ def test_id_conflict():
                    6519, 6523, 6529, 6625, 6651, 6699, 6736, 6777, 6837, 6991, 7207, 7258, 7266,
                    7288, 7480, 7554, 7915, 8075, 8086, 8197, 8209, 8368, 8398, 8479, 8856, 9121,
                    9174, 9222, 9312, 9323, 9327, 9417, 9633, 9797, 9864, 10664]
-    case = bioCanon.id_conflict(required_tiles, flanking, all_variable)
+    case = __main__.id_conflict(required_tiles, flanking, all_variable)
     compare = {359: [366], 515: [507], 1895: [1893]}
     assert case == compare

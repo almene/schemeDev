@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 
 
 def test_generate_new_codes():
@@ -65,7 +65,7 @@ def test_generate_new_codes():
             11: ['z.1.1.1.z.1.1.1.1.1.z', 'z.1.1.1.z.1.1.1.1.1.z', 'z.1.1.1.z.1.1.1.1.1.1',
                  'z.1.1.1.z.1.1.1.1.1.1']}
     iterators = [0, 'B']
-    bioCanon.generate_new_codes(checking, switch, groups, used, iterators)
+    __main__.generate_new_codes(checking, switch, groups, used, iterators)
     compare = {'A': ['1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                'B': ['2', 'z.1', 'z.1.1', 'z.1.1.1', 'z.1.1.1.1', 0, 0, 0, 0, 0, 0, 0],
                'C': ['z', 'z.1', 'z.1.1', 'z.1.1.z', 'z.1.1.z.1', 0, 0, 0, 0, 0, 0, 0],

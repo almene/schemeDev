@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 from Bio import SeqIO
 import os
 
@@ -24,7 +24,7 @@ def test_add_tiles():
     ref_file = os.path.join(os.getcwd(), "tests", "examples", "ref.fasta")
     for seq_record in SeqIO.parse(ref_file, "fasta"):
         ref_seq = "{}".format(seq_record.seq)
-    case = bioCanon.add_tiles(scheme, ref_seq, flanking, conflict_pos)
+    case = __main__.add_tiles(scheme, ref_seq, flanking, conflict_pos)
     compare = {9: {}, 8: {1: [
         {'position': 359, 'ref_base': 'T', 'alt_base': 'C', 'ref_count': 17, 'alt_count': 5,
          'positive_group': 'alt', 'g_id': 1, 'rank_id': 8,

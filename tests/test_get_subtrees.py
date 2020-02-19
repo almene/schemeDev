@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 
 
 def test_get_subtrees():
@@ -24,7 +24,7 @@ def test_get_subtrees():
                    'D': [1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                    'V': [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                    'A': [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
-    case = bioCanon.get_subtrees(memberships)
+    case = __main__.get_subtrees(memberships)
     compare = {21: [(['Q', 'R', 'O', 'P', 'J', 'I', 'H', 'G', 'S', 'F', 'B', 'C', 'T', 'U', 'M',
                       'N', 'K', 'L', 'E', 'D', 'V'], 0, 1)],
                1: [(['A'], 0, 2), (['A'], 1, 0), (['D'], 2, 3), (['V'], 2, 4), (['A'], 2, 0),

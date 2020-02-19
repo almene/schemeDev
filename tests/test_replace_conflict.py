@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 
 
 def test_replace_conflict():
@@ -18,7 +18,7 @@ def test_replace_conflict():
         {'position': 1895, 'ref_base': 'C', 'alt_base': 'A', 'ref_count': 17, 'alt_count': 5,
          'positive_group': 'alt', 'g_id': 1, 'rank_id': 8, 'qc_warnings': []}]}}
     scheme_pieces = [8, 1, 0]
-    bioCanon.replace_conflict(conflict, start, scheme, scheme_pieces)
+    __main__.replace_conflict(conflict, start, scheme, scheme_pieces)
     compare = {9: {}, 8: {1: [
         {'position': 359, 'ref_base': 'T', 'alt_base': 'C', 'ref_count': 17, 'alt_count': 5,
          'positive_group': 'alt', 'g_id': 1, 'rank_id': 8, 'qc_warnings': [],

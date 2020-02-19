@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 
 
 def test_mask_unsupported():
@@ -48,7 +48,7 @@ def test_mask_unsupported():
          'qc_warnings': ['One or more degenerate bases'],
          'positive_tile': 'GCCTGAATCTGGANAACTGGCAGGCGGAACT',
          'negative_tile': 'GCCTGAATCTGGANACCTGGCAGGCGGAACT'}]}}
-    bioCanon.mask_unsupported(memberships, scheme)
+    __main__.mask_unsupported(memberships, scheme)
     compare = {'Q': [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], 'R': [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
                'O': [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], 'P': [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
                'J': [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], 'I': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

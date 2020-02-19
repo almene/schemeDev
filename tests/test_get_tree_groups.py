@@ -1,11 +1,11 @@
-import bioCanon
+from bioCanon import __main__
 from ete3 import Tree
 
 
 def test_get_tree():
     testing_tree = Tree("((((((((((((Q,R),(O,P)),J),I),H),G),(S,F)),B),(C,(T,U))),"
                         "(((M,N),(K,L)),E)),(D,V)),A);")
-    case = bioCanon.get_tree_groups(testing_tree)
+    case = __main__.get_tree_groups(testing_tree)
     compare = {'Q': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 'R': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2],
                'O': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3], 'P': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 4],
                'J': [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0], 'I': [1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0],

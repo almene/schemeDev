@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 
 
 def test_get_subtrees():
@@ -37,6 +37,6 @@ def test_get_subtrees():
                       'L', 'E', 'D', 'V', 'A'], 10, 0),
                     (['J', 'I', 'H', 'G', 'S', 'F', 'B', 'C', 'T', 'U', 'M', 'N', 'K',
                       'L', 'E', 'D', 'V', 'A'], 11, 0)]}
-    case = bioCanon.search_st(alt, ranks, groups, subtrees)
+    case = __main__.search_st(alt, ranks, groups, subtrees)
     compare = ([3], [2])
     assert case == compare

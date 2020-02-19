@@ -1,11 +1,11 @@
-import bioCanon
+from bioCanon import __main__
 import os
 
 
 def test_tree_path():
     group_info = "none"
     tree_file = os.path.join(os.getcwd(), "tests", "examples", "testing.nwk")
-    case = bioCanon.path_check(group_info, tree_file)
+    case = __main__.path_check(group_info, tree_file)
     compare = ({'Q': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 'R': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2],
                 'O': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3],
@@ -36,7 +36,7 @@ def test_tree_path():
 def test_groups_path():
     tree_file = "none"
     group_info = os.path.join(os.getcwd(), "tests", "examples", "testing.tsv")
-    case = bioCanon.path_check(group_info, tree_file)
+    case = __main__.path_check(group_info, tree_file)
     compare = ({'A': ['1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 'B': ['2', '2.1', '2.1.1', '2.1.1.1', '2.1.1.1.1', 0, 0, 0, 0, 0, 0, 0],
                 'C': ['2', '2.1', '2.1.1', '2.1.1.2', '2.1.1.2.1', 0, 0, 0, 0, 0, 0, 0],

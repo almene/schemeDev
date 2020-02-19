@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 import os
 import vcfpy
 
@@ -8,7 +8,7 @@ def test_alt_or_ref():
     reader = vcfpy.Reader.from_path(vcf_file)
     samples = reader.header.samples.names
     for record in reader:
-        case = bioCanon.alt_or_ref(record, samples)
+        case = __main__.alt_or_ref(record, samples)
         compare = (['A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
                     'R', 'S', 'V'], ['C', 'T', 'U'])
         assert case == compare

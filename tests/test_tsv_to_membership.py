@@ -1,10 +1,10 @@
-import bioCanon
+from bioCanon import __main__
 import os
 
 
 def test_groups_path():
     group_info = os.path.join(os.getcwd(), "tests", "examples", "testing.tsv")
-    case = bioCanon.tsv_to_membership(group_info)
+    case = __main__.tsv_to_membership(group_info)
     compare = {'A': ['1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                'B': ['2', '2.1', '2.1.1', '2.1.1.1', '2.1.1.1.1', 0, 0, 0, 0, 0, 0, 0],
                'C': ['2', '2.1', '2.1.1', '2.1.1.2', '2.1.1.2.1', 0, 0, 0, 0, 0, 0, 0],

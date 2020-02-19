@@ -1,4 +1,4 @@
-import bioCanon
+from bioCanon import __main__
 
 
 def test_filter_by_snps():
@@ -17,7 +17,7 @@ def test_filter_by_snps():
                              {'position': 1895, 'ref_base': 'C', 'alt_base': 'A', 'ref_count': 17,
                               'alt_count': 5, 'positive_group': 'alt', 'g_id': 1, 'rank_id': 8,
                               'qc_warnings': []}]}}
-    case = bioCanon.filter_by_snps(scheme, 2)
+    case = __main__.filter_by_snps(scheme, 2)
     case.sort()
     compare = [359, 515, 1895, 9797, 9864]
     assert case == compare
