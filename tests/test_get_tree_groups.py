@@ -1,4 +1,4 @@
-from bioCanon import bioCanon
+import bioCanon
 from ete3 import Tree
 
 

@@ -1,5 +1,4 @@
-# generate_new_codes(checking, switch, groups, used, iterators: list):
-from bioCanon import bioCanon
+import bioCanon
 
 
 def test_generate_new_codes():

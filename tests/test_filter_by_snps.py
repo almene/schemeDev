@@ -1,4 +1,4 @@
-from bioCanon import bioCanon
+import bioCanon
 
 
 def test_filter_by_snps():

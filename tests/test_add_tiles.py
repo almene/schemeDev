@@ -1,5 +1,4 @@
-# add_tiles(scheme, ref_seq, flanking, conflict_positions):
-from bioCanon import bioCanon
+import bioCanon
 from Bio import SeqIO
 import os
 
