@@ -50,12 +50,12 @@ python3 -m bioCanon --in_vcf tests/examples/testing.vcf --in_nwk tests/examples/
 #### Arguments
 
 ##### --in_vcf
-*Required
+* Required
 
 vcfpy reader compatible vcf file.  See vcfpy documentation for specific requirements
 
 ##### --in_nwk or --group_info
-*Either --in_nwk or --group_info required
+* Either --in_nwk or --group_info required
 
 --in_nwk requires a Newick format tree file
 ```
@@ -90,25 +90,25 @@ V	2	2.2
 Above is an example of the required format
 
 ##### --reference
-*Required
+* Required
 
 fasta format reference genome file
 
 ##### --min_snps, --min_members, and --min_parent
-*Optional
+* Optional
 
 Integer variables that restrict what is considered a valid group: minimum number of snps that support a division, miminum members required to generate a valid group and minimum size difference between a subgroup and its parent group required for the subgroup to be considered valid
 
-*Defaults : 2, 5, 2
+* Defaults : 2, 5, 2
 ##### --flanking
-*Optional
+* Optional
 
 Integer number of bases flanking the SNP site, determines k-mer size
 
-*Default: 15
+* Default: 15
 
 ##### --outdir
-*Optional
+* Optional
 
 Name for an output directory
 
