@@ -3,7 +3,9 @@
 Biohansel requires a strain-specific fasta format scheme to be able to classify samples.
 Schemes exist for some common clonal pathogens, but there are many untapped applications.
 This module includes functions to aid in the generation of k-mers linked to predefined groups
-to serve as the basis for automatic scheme development
+to serve as the basis for automatic scheme development.  The only test of k-mer quality is the
+exclusion of k-mers with degenerate bases.  Further filtering of output kmers will be required
+to improve the quality of the biohansel scheme.
 
 ## Getting Started
 
@@ -115,11 +117,11 @@ Name for an output directory
 ### Outputs
 Three files will be produced by a successful run of the bioCanon module:
 * codes.log
-  * contains the samples used to build the scheme along with the biohansel code that they were assigned by the scheme
+  * This file contains the samples used to build the scheme along with the biohansel code that they were assigned by the scheme
 * a biohansel.fasta file
-  * a biohansel compatible scheme file
-* a buigabsek.log file
-  * contains a more human-readable version of the information contained in the biohansel.fasta file
+  * This file contains all the non-degenerate positve and negative k-mers required for a biohansel scheme.  This will require further filtering for optimal scheme development
+* a biohansel.log file
+  * This file contains a more human-readable version of the information contained in the biohansel.fasta file
 
 Names for the biohansel.fasta and biohansel.log files are derived from the options used to construct them.  The naming structure is as follows:
 ```
