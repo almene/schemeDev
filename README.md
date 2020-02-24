@@ -112,6 +112,12 @@ Integer number of bases flanking the SNP site, determines k-mer size
 
 Name for an output directory
 
+### Outputs
+Three files will be produced by a successful run of the bioCanon module:
+* codes.log
+* a biohansel fasta file
+* 
+
 ## Running the tests
 
 Tests for the module can be found in the respository under the tests subfolder.  They are pytest compatible scripts and once downloaded can be read using the python -m pytest command from the downloaded repository directory.
