@@ -712,9 +712,6 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         contains information of memberships, leaf names and information source
     outdir: str
         user specified name of output directory
-    See Also
-    --------
-    get_tree_groups(), tsv_to_membership()
     """
     min_snps, min_group_size, min_parent_size, flanking = numerical_parameters
     memberships, leaves, path = groups
@@ -927,11 +924,6 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                "w+")
     fasta_file = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}"
                                              f"_biohansel.fasta"), "w+")
-    check = open(os.path.join(out_path, f"checking.txt"), "w+")
-    for i in range(0, biohansel_codes.shape[0]):
-        check.write("{}\t{}".format(biohansel_codes.index.values[i],
-                                    "\t".join(str(v) for v in biohansel_codes.values[i,])) + "\n")
-    check.close()
     first_instance = dict()
     for rank in scheme:
         # translate the rank into the position in the table that has all
