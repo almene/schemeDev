@@ -115,8 +115,13 @@ Name for an output directory
 ### Outputs
 Three files will be produced by a successful run of the bioCanon module:
 * codes.log
-* a biohansel fasta file
-* 
+** contains the samples used to build the scheme along with the biohansel code that they were assigned by the scheme
+* a biohansel.fasta file
+** a biohansel compatiple scheme file
+* a buigabsek.log file
+** contains a more human readable version of the information contained in the biohansel.fasta file
+
+Names for the biohansel.fasta and biohansel.log files are derived from the options used to construct them.  The naming structure is as follows: S(min snps)G(mingroupsize)\_biohansel.fasta(or log)
 
 ## Running the tests
 
