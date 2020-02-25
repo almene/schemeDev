@@ -440,7 +440,7 @@ def add_tiles(scheme, ref_seq, flanking, conflict_positions):
     return scheme
 
 
-def filter_by_snps(scheme, min_snps):
+def filter_by_snps(scheme, min_snps, ignored_for_snps):
     """
     Takes the current scheme and removes any entries that do not meet the minimum snp support
     requirement.  Additionally it marks down the location of variable positions for
@@ -451,10 +451,14 @@ def filter_by_snps(scheme, min_snps):
         contains the current working scheme information
     min_snps: int
         user specified desired number of snps required for a group to be validly supported
+    ignored_for_snps: int
+        number of snps that match a branch point but not the minimum snp support requirement
     Returns
     -------
     required_tiles: list
         List of positions for snps that support a valid grouping
+    ignored_for_snps: int
+        number of snps that match a branch point but not the minimum snp support requirement
     """
     # initialize required values
     required_tiles = list()
@@ -490,8 +494,10 @@ def filter_by_snps(scheme, min_snps):
                 duplicates.sort(reverse=True)
                 for i in range(0, len(duplicates)):
                     scheme[rank][g_id].pop(i)
+            else:
+                ignored_for_snps += len(scheme[rank][g_id])
         scheme[rank] = valid
-    return required_tiles
+    return required_tiles, ignored_for_snps
 
 
 def alt_or_ref(record, samples: list):
@@ -775,6 +781,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     ignored_for_degenerate_kmer = 0
     no_branchpoint = 0
     branchpoint_snps = 0
+    ignored_for_snps = 0
 
     for record in reader:
         # skip over the metadata lines at the top of the file
@@ -876,7 +883,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         else:
             ignored_for_groupsize += 1
     # filter out groups with less than minimum number of supporting snps
-    required_tiles = filter_by_snps(scheme, min_snps)
+    required_tiles, ignored_for_snps = filter_by_snps(scheme, min_snps, ignored_for_snps)
     # sort the lists of both all the variable positions and the ones of
     # interest for the tile selection
     all_variable.sort()
@@ -897,9 +904,12 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                     ignored_for_degenerate_kmer +=1
                     good_snps -= 1
             if good_snps < min_snps:
+                ignored_for_snps += good_snps
                 for item in range(0, len(scheme[rank][g_id])):
                     scheme[rank][g_id][item]["qc_warnings"].append("Lacks good tile support")
-            branchpoint_snps += good_snps
+
+            else:
+                branchpoint_snps += good_snps
 
     stripped_pos = []
     for rank in scheme:
@@ -944,12 +954,14 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                                              f"_biohansel.fasta"), "w+")
     first_instance = dict()
     if total_snps != (ignored_for_multiple_states + ignored_for_degenerate_kmer +
-                      ignored_for_groupsize + branchpoint_snps + no_branchpoint):
+                      ignored_for_groupsize + branchpoint_snps + no_branchpoint + ignored_for_snps):
         print("Count logic off")
     print(f"There were {total_snps} in the vcf file.\n "
           f"{no_branchpoint} did not match a branch point\n "
           f"{ignored_for_groupsize} of these were ignored due to not matching the group "
           f"size requirement\n "
+          f"{ignored_for_snps} of these because their group did not have "
+          f"at least {min_snps} snps for support\n "
           f"{ignored_for_degenerate_kmer} of these were ignored because they produced "
           f"degenerate k-mer tiles\n {ignored_for_multiple_states} were ignored due to "
           f"having more than two alt states\n {branchpoint_snps} were found to match to a "
