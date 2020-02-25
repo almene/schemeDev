@@ -1,9 +1,11 @@
 # bioCanon
 
-Biohansel requires a strain specific fasta format scheme to be able to classify samples.
-Schemes exist for some common clonal pathogens but there are many untapped applications.
+Biohansel requires a strain-specific fasta format scheme to be able to classify samples.
+Schemes exist for some common clonal pathogens, but there are many untapped applications.
 This module includes functions to aid in the generation of k-mers linked to predefined groups
-to serve as the basis for automatic scheme development
+to serve as the basis for automatic scheme development.  The only test of k-mer quality is the
+exclusion of k-mers with degenerate bases.  Further filtering of output kmers will be required
+to improve the quality of the biohansel scheme.
 
 ## Getting Started
 
@@ -33,7 +35,7 @@ require some libraries to be installed via apt-get (zlib1g-dev,  libbz2-dev and 
 
 ### Installing
 
-After all dependencies have been installed bioCanon can be installed via pip from the github repository
+After all dependencies have been installed bioCanon can be installed via pip from the GitHub repository
 
 ```
 pip install git+https://github.com/almene/schemeDev.git#egg=schemeDev
@@ -41,7 +43,7 @@ pip install git+https://github.com/almene/schemeDev.git#egg=schemeDev
 
 ### Using the Module
 
-Once it has been installed the module can be run from the comandline.  There are several arguments that the module accepts.  Some of them are required and some are optional.
+Once it has been installed, the module can be run from the command line.  There are several arguments that the module accepts.  Some of them are required and some are optional.
 
 ```
 python3 -m bioCanon --in_vcf tests/examples/testing.vcf --in_nwk tests/examples/testing.nwk --reference tests/examples/ref.fasta --min_snps 2 --min_members 5 --min_parent 5 --outdir testcases
@@ -64,28 +66,28 @@ vcfpy reader compatible vcf file.  See vcfpy documentation for specific requirem
 --group_info requires a tsv format file that contains the group information
 
 ```
-A	1	
-B	2	2.1	2.1.1	2.1.1.1	2.1.1.1.1
-C	2	2.1	2.1.1	2.1.1.2	2.1.1.2.1
-D	2	2.2	
-E	2	2.1	2.1.2	2.1.2.1	2.1.1.1.2
-F	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.2
-G	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.2
-H	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.1	2.1.1.1.2.1.1.2
-I	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.1	2.1.1.1.2.1.1.1	2.1.1.1.2.1.1.1.2
-J	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.1	2.1.1.1.2.1.1.1	2.1.1.1.2.1.1.1.1	2.1.1.1.2.1.1.1.1.2
-K	2	2.1	2.1.2	2.1.2.2	2.1.2.2.2
-L	2	2.1	2.1.2	2.1.2.2	2.1.2.2.2
-M	2	2.1	2.1.2	2.1.2.2	2.1.2.2.1
-N	2	2.1	2.1.2	2.1.2.2	2.1.2.2.1
-O	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.1	2.1.1.1.2.1.1.1	2.1.1.1.2.1.1.1.1	2.1.1.1.2.1.1.1.1.1	2.1.1.1.2.1.1.1.1.1.2
-P	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.1	2.1.1.1.2.1.1.1	2.1.1.1.2.1.1.1.1	2.1.1.1.2.1.1.1.1.1	2.1.1.1.2.1.1.1.1.1.2
-Q	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.1	2.1.1.1.2.1.1.1	2.1.1.1.2.1.1.1.1	2.1.1.1.2.1.1.1.1.1	2.1.1.1.2.1.1.1.1.1.1
-R	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.1	2.1.1.1.2.1.1	2.1.1.1.2.1.1.1	2.1.1.1.2.1.1.1.1	2.1.1.1.2.1.1.1.1.1	2.1.1.1.2.1.1.1.1.1.1
-S	2	2.1	2.1.1	2.1.1.1	2.1.1.1.2	2.1.1.1.2.2
-T	2	2.1	2.1.1	2.1.1.2	2.1.1.2.2
-U	2	2.1	2.1.1	2.1.1.2	2.1.1.2.2
-V	2	2.2
+A    1    
+B    2    2.1    2.1.1    2.1.1.1    2.1.1.1.1
+C    2    2.1    2.1.1    2.1.1.2    2.1.1.2.1
+D    2    2.2    
+E    2    2.1    2.1.2    2.1.2.1    2.1.1.1.2
+F    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.2
+G    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.2
+H    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.1    2.1.1.1.2.1.1.2
+I    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.1    2.1.1.1.2.1.1.1    2.1.1.1.2.1.1.1.2
+J    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.1    2.1.1.1.2.1.1.1    2.1.1.1.2.1.1.1.1    2.1.1.1.2.1.1.1.1.2
+K    2    2.1    2.1.2    2.1.2.2    2.1.2.2.2
+L    2    2.1    2.1.2    2.1.2.2    2.1.2.2.2
+M    2    2.1    2.1.2    2.1.2.2    2.1.2.2.1
+N    2    2.1    2.1.2    2.1.2.2    2.1.2.2.1
+O    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.1    2.1.1.1.2.1.1.1    2.1.1.1.2.1.1.1.1    2.1.1.1.2.1.1.1.1.1    2.1.1.1.2.1.1.1.1.1.2
+P    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.1    2.1.1.1.2.1.1.1    2.1.1.1.2.1.1.1.1    2.1.1.1.2.1.1.1.1.1    2.1.1.1.2.1.1.1.1.1.2
+Q    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.1    2.1.1.1.2.1.1.1    2.1.1.1.2.1.1.1.1    2.1.1.1.2.1.1.1.1.1    2.1.1.1.2.1.1.1.1.1.1
+R    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.1    2.1.1.1.2.1.1    2.1.1.1.2.1.1.1    2.1.1.1.2.1.1.1.1    2.1.1.1.2.1.1.1.1.1    2.1.1.1.2.1.1.1.1.1.1
+S    2    2.1    2.1.1    2.1.1.1    2.1.1.1.2    2.1.1.1.2.2
+T    2    2.1    2.1.1    2.1.1.2    2.1.1.2.2
+U    2    2.1    2.1.1    2.1.1.2    2.1.1.2.2
+V    2    2.2
 ```
 Above is an example of the required format
 
@@ -97,13 +99,13 @@ fasta format reference genome file
 ##### --min_snps, --min_members, and --min_parent
 * Optional
 
-Integer variables that restrict what is considered a valid group: minimum number of snps that support a division, miminum members required to generate a valid group and minimum size difference between a subgroup and its parent group required for the subgroup to be considered valid
+Integer variables that restrict what is considered a valid group: minimum number of snps that support a division, minimum members required to generate a valid group and minimum size difference between a subgroup and its parent group required for the subgroup to be considered valid
 
 * Defaults : 2, 5, 2
 ##### --flanking
 * Optional
 
-Integer number of bases flanking the SNP site, determines k-mer size
+Integer number of bases flanking the SNP site determines the k-mer size
 
 * Default: 15
 
@@ -112,9 +114,22 @@ Integer number of bases flanking the SNP site, determines k-mer size
 
 Name for an output directory
 
+### Outputs
+Three files will be produced by a successful run of the bioCanon module:
+* codes.log
+  * This file contains the samples used to build the scheme along with the biohansel code that they were assigned by the scheme
+* a biohansel.fasta file
+  * This file contains all the non-degenerate positve and negative k-mers required for a biohansel scheme.  This will require further filtering for optimal scheme development
+* a biohansel.log file
+  * This file contains a more human-readable version of the information contained in the biohansel.fasta file
+
+Names for the biohansel.fasta and biohansel.log files are derived from the options used to construct them.  The naming structure is as follows:
+```
+S(min snps)G(min group size)\_biohansel.fasta(or log)
+```
 ## Running the tests
 
-Tests for the module can be found in the respository under the tests subfolder.  They are pytest compatible scripts and once downloaded can be read using the python -m pytest command from the downloaded repository directory.
+Tests for the module can be found in the repository under the tests subfolder.  They are pytest compatible scripts and once downloaded can be read using the python -m pytest command from the downloaded repository directory.
 
 The current testing suite tests functions in main by supplying them with test data and comparing it against an expected result.
 
@@ -130,4 +145,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* James Robertson and Justin Schonfeld for their help in development
+* James Robertson and Justin Schonfeld for their help in the development
