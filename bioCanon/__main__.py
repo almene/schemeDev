@@ -769,17 +769,25 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         raise SystemExit(0)
     scheme = dict()
     all_variable = []
+    total_snps = 0
+    ignored_for_groupsize = 0
+    ignored_for_multiple_states = 0
+    ignored_for_degenerate_kmer = 0
+    no_branchpoint = 0
+    branchpoint_snps = 0
 
     for record in reader:
         # skip over the metadata lines at the top of the file
         if not record.is_snv():
             continue
+        total_snps += 1
         # pull the positional information and the reference
         # value and all the alt values from the vcf file
         line = [record.CHROM, record.POS, record.REF]
         line += [alt.value for alt in record.ALT]
         # skip any vcf calls that have multiple alternative alleles
         if len(record.ALT) > 1:
+            ignored_for_multiple_states += 1
             continue
         # initialize variables and pull the ref and alt SNPs
         alt_base = record.ALT[0].value
@@ -802,24 +810,23 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
             if len(ref_group) in subtrees.keys():
                 valid_ranks, valid_groups = search_st(ref_group, valid_ranks, valid_groups,
                                                       subtrees)
-            if len(valid_ranks) < 1:
-                continue
-            for i in range(0, len(valid_ranks)):
-                if valid_ranks[i] not in ref_cand_part:
-                    ref_cand_part[valid_ranks[i]] = list()
-                if valid_groups[i] == 0:
-                    continue
-                # if the partition is already supported add the information about that
-                # snp if not created it
-                ref_cand_part[valid_ranks[i]].append({"position": position,
-                                                      "ref_base": ref_base,
-                                                      "alt_base": alt_base,
-                                                      "ref_count": len(ref_group),
-                                                      "alt_count": len(alt_group),
-                                                      "positive_group": "ref",
-                                                      "g_id": valid_groups[i],
-                                                      "rank_id": valid_ranks[i],
-                                                      "qc_warnings": []})
+            if len(valid_ranks) >= 1:
+                for i in range(0, len(valid_ranks)):
+                    if valid_ranks[i] not in ref_cand_part:
+                        ref_cand_part[valid_ranks[i]] = list()
+                    if valid_groups[i] == 0:
+                        continue
+                    # if the partition is already supported add the information about that
+                    # snp if not created it
+                    ref_cand_part[valid_ranks[i]].append({"position": position,
+                                                          "ref_base": ref_base,
+                                                          "alt_base": alt_base,
+                                                          "ref_count": len(ref_group),
+                                                          "alt_count": len(alt_group),
+                                                          "positive_group": "ref",
+                                                          "g_id": valid_groups[i],
+                                                          "rank_id": valid_ranks[i],
+                                                          "qc_warnings": []})
             if len(alt_group) in subtrees.keys():
                 valid_ranks_alt, valid_groups_alt = search_st(alt_group, valid_ranks, valid_groups,
                                                               subtrees)
@@ -846,8 +853,10 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 for item in ref_cand_part[rank]:
                     # filter out groups which are too small
                     if item['ref_count'] < min_group_size:
+                        ignored_for_groupsize +=1
                         continue
                     if item['alt_count'] < min_group_size:
+                        ignored_for_groupsize += 1
                         continue
                     if not item["g_id"] in scheme[rank]:
                         scheme[rank][item["g_id"]] = []
@@ -862,6 +871,10 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                     if not item["g_id"] in scheme[rank]:
                         scheme[rank][item["g_id"]] = []
                     scheme[rank][item["g_id"]].append(item)
+            if not valid_ranks_alt and not valid_ranks:
+                no_branchpoint += 1
+        else:
+            ignored_for_groupsize += 1
     # filter out groups with less than minimum number of supporting snps
     required_tiles = filter_by_snps(scheme, min_snps)
     # sort the lists of both all the variable positions and the ones of
@@ -881,10 +894,12 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
             for item in range(0, len(scheme[rank][g_id])):
                 positions.append(scheme[rank][g_id][item]["position"])
                 if len(scheme[rank][g_id][item]["qc_warnings"]) > 0:
+                    ignored_for_degenerate_kmer +=1
                     good_snps -= 1
             if good_snps < min_snps:
                 for item in range(0, len(scheme[rank][g_id])):
                     scheme[rank][g_id][item]["qc_warnings"].append("Lacks good tile support")
+            branchpoint_snps += good_snps
 
     stripped_pos = []
     for rank in scheme:
@@ -918,6 +933,9 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     out_path = os.path.join(os.getcwd(), outdir)
     codes = open(os.path.join(out_path, "codes.log"), "w+")
     for i in range(0, len(leaves) - 1):
+        if len(biohansel_codes.values[i]) == 0:
+            print("Something has gone wrong with the code assignments")
+            raise SystemExit(0)
         codes.write(f"{biohansel_codes.index[i]} : {biohansel_codes.values[i, -1]}\n")
     codes.close()
     log = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}_biohansel.log"),
@@ -925,6 +943,18 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     fasta_file = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}"
                                              f"_biohansel.fasta"), "w+")
     first_instance = dict()
+    if total_snps != (ignored_for_multiple_states + ignored_for_degenerate_kmer +
+                      ignored_for_groupsize + branchpoint_snps + no_branchpoint):
+        print("Count logic off")
+    print(f"There were {total_snps} in the vcf file.\n "
+          f"{no_branchpoint} did not match a branch point\n "
+          f"{ignored_for_groupsize} of these were ignored due to not matching the group "
+          f"size requirement\n "
+          f"{ignored_for_degenerate_kmer} of these were ignored because they produced "
+          f"degenerate k-mer tiles\n {ignored_for_multiple_states} were ignored due to "
+          f"having more than two alt states\n {branchpoint_snps} were found to match to a "
+          f"branch point.")
+
     for rank in scheme:
         # translate the rank into the position in the table that has all
         # the undefined columns are dropped
