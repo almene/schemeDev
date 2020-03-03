@@ -1018,7 +1018,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 neg_tile = scheme[rank][g_id][item]["negative_tile"]
 
                 # write out the biohansel fasta files and the accompanying logs
-                snp_report.write(f"The snp at {position} was found to support the {code} group.\n"
+                snp_report.write(f"The snp at {position} was found to support the {code} group.\n")
                 log.write(f"{position}\t{code}\t{pos_tile}\n")
                 fasta_file.write(f">{position}-{code}\n{pos_tile}\n")
                 log.write(f"negative{position}\t{code}\t{neg_tile}\n")
