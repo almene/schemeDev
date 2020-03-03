@@ -956,6 +956,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                                              f"snp_report.txt"), "w+")
 
     not_mapped = np.setdiff1d(required_tiles, all_variable)
+    print(not_mapped)
     for i in not_mapped:
         snp_report.write(f"The snp at {i} was not included in the scheme because it could not be"
                          f" matched to a branch point in the data.\n")
