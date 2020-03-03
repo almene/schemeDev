@@ -782,10 +782,12 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     no_branchpoint = 0
     branchpoint_snps = 0
     ignored_for_snps = 0
-
+    not_snv = 0
+    not_mapped_pos = []
     for record in reader:
         # skip over the metadata lines at the top of the file
         if not record.is_snv():
+            not_snv += 1
             continue
         total_snps += 1
         # pull the positional information and the reference
@@ -860,7 +862,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 for item in ref_cand_part[rank]:
                     # filter out groups which are too small
                     if item['ref_count'] < min_group_size:
-                        ignored_for_groupsize +=1
+                        ignored_for_groupsize += 1
                         continue
                     if item['alt_count'] < min_group_size:
                         ignored_for_groupsize += 1
@@ -880,6 +882,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                     scheme[rank][item["g_id"]].append(item)
             if not valid_ranks_alt and not valid_ranks:
                 no_branchpoint += 1
+                not_mapped_pos.append(position)
         else:
             ignored_for_groupsize += 1
     # filter out groups with less than minimum number of supporting snps
@@ -954,18 +957,16 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                                              f"_biohansel.fasta"), "w+")
     snp_report = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}"
                                              f"snp_report.txt"), "w+")
-
-    not_mapped = np.setdiff1d(all_variable, required_tiles)
-    print(not_mapped)
-    print(len(not_mapped))
-    for i in not_mapped:
+    for i in not_mapped_pos:
         snp_report.write(f"The snp at {i} was not included in the scheme because it could not be"
                          f" matched to a branch point in the data.\n")
     first_instance = dict()
     if total_snps != (ignored_for_multiple_states + ignored_for_degenerate_kmer +
-                      ignored_for_groupsize + branchpoint_snps + no_branchpoint + ignored_for_snps):
+                      ignored_for_groupsize + branchpoint_snps + no_branchpoint + ignored_for_snps +
+                      not_snv):
         print("Count logic off")
     print(f"There were {total_snps} in the vcf file.\n "
+          f"{not_snv} were not snps \n"
           f"{no_branchpoint} did not match a branch point\n "
           f"{ignored_for_groupsize} of these were ignored due to not matching the group "
           f"size requirement\n "
