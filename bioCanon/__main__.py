@@ -952,6 +952,13 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                "w+")
     fasta_file = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}"
                                              f"_biohansel.fasta"), "w+")
+    snp_report = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}"
+                                             f"snp_report.txt"), "w+")
+
+    not_mapped = np.setdiff1d(required_tiles, all_variable)
+    for i in not_mapped:
+        snp_report.write(f"The snp at {i} was not included in the scheme because it could not be"
+                         f" matched to a branch point in the data.\n")
     first_instance = dict()
     if total_snps != (ignored_for_multiple_states + ignored_for_degenerate_kmer +
                       ignored_for_groupsize + branchpoint_snps + no_branchpoint + ignored_for_snps):
@@ -995,19 +1002,23 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 if code not in first_instance.keys():
                     first_instance[code] = rank_id
             for item in range(0, len(scheme[rank][g_id])):
+                position = scheme[rank][g_id][item]["position"]
                 # exclude the the entries that have qc problems
                 if len(scheme[rank][g_id][item]["qc_warnings"]) != 0:
+                    reasons = scheme[rank][g_id][item]["qc_warnings"]
+                    snp_report.write(f"The snp at {position} was not included in the scheme due "
+                                     f"to {reasons}\n")
                     continue
                 if rank_id != first_instance[code]:
                     continue
                 if rank_id < first_instance[code]:
                     print("There has been an error in logic")
                 # extract the required information from the entries that have good qc
-                position = scheme[rank][g_id][item]["position"]
                 pos_tile = scheme[rank][g_id][item]["positive_tile"]
                 neg_tile = scheme[rank][g_id][item]["negative_tile"]
 
                 # write out the biohansel fasta files and the accompanying logs
+                snp_report.write(f"The snp at {position} was found to support the {code} group.\n"
                 log.write(f"{position}\t{code}\t{pos_tile}\n")
                 fasta_file.write(f">{position}-{code}\n{pos_tile}\n")
                 log.write(f"negative{position}\t{code}\t{neg_tile}\n")
