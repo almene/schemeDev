@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="bioCanon-almene", # Replace with your own username
-    version="0.0.5",
+    version="0.0.6",
     author="Amanda Saunders",
     author_email="saunders.mandy@hotmail.com",
     description="A package for generating potential biohansel schemes",
