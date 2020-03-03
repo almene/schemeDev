@@ -38,7 +38,7 @@ require some libraries to be installed via apt-get (zlib1g-dev,  libbz2-dev and 
 After all dependencies have been installed bioCanon can be installed via pip from the GitHub repository
 
 ```
-pip install git+https://github.com/almene/schemeDev.git#egg=schemeDev
+pip install git+https://github.com/almene/schemeDev.git#egg=biocanon-almene
 ```
 
 ### Using the Module
