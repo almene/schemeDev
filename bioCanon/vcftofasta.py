@@ -59,11 +59,13 @@ def main():
     fasta_dict = dict()
     samples = reader.header.samples.names
     writer = vcfpy.Writer.from_path(f'{out}.vcf', reader.header)
+    in_vcf = []
     for record in reader:
         # skip over the metadata lines at the top of the file
         if not record.is_snv():
             continue
         position = f"{record.POS}"
+        in_vcf.append(position)
         if Opp == 1 :
             if position in pos_list:
                 writer.write_record(record)
@@ -110,6 +112,19 @@ def main():
                     else:
                         fasta_dict[sample_name] += alt_base
                     tracker += 1
+    # display a warning if the supplied csv list is not a subset of all the positions in the file
+    if not (all(x in in_vcf for x in pos_list)):
+        print("WARNING:\nOne or more positions in the supplied csv file are not found in the original vcf file")
+    flag =0
+    in_vcf.sort()
+    for i in range(0, (len(in_vcf)-1)):
+        if in_vcf[i] == in_vcf[i+1]:
+            flag = 1
+
+    if flag:
+        print("WARNING:\nOne or more entries in the supplied vcf file contained the same numerical position value."
+              " Both entries were processed in the desired manner i.e. if the position value was to be kept both were "
+              "kept, if they were to be removed they were both removed")
 
     fasta_file = open(os.path.join(out_path, f"{out}.fasta"), "w+")
     for key in fasta_dict.keys():
