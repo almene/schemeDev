@@ -1,27 +1,45 @@
-import vcfpy
-from argparse import ArgumentParser
-from Bio import SeqIO
+"""
+During the generation of Biohansel schemes filtering of the vcf files may be necessary to remove
+snp locations that are not helpful for a variety of reasons.  This script filters a vcf file to keep
+ or remove desired positions and also outputs a fasta file with all the snp position values
+ concatenated for the samples so that a new, refined phylogeny can be constructed
+"""
 import os
 import csv
+from argparse import ArgumentParser
+import vcfpy
 
 
 def parse_args():
-    "Parse the input arguments, use '-h' for help"
+    """
+    Parse the input arguments, use '-h' for help
+
+        Returns
+        -------
+            parser_inner.parse_args()
+    """
     parser_inner = ArgumentParser(
         description='BioHansel Scheme development accessory script')
     parser_inner.add_argument('--in_vcf', type=str, required=True, help='vcf File of SNPs')
     parser_inner.add_argument('--outdir', type=str, required=False, default=os.getcwd(),
                               help='Output Directory to put results')
     parser_inner.add_argument('--keep_csv', type=str, required=False,
-                              help='csv file with comma deliminated positions to be kept for the reduced fasta file')
+                              help='csv file with comma deliminated positions to be kept for the'
+                                   ' reduced fasta file')
     parser_inner.add_argument('--remove_csv', type=str, required=False,
-                              help='csv file with comma deliminated positions to be removed for the reduced fasta file')
+                              help='csv file with comma deliminated positions to be removed for the'
+                                   ' reduced fasta file')
     parser_inner.add_argument('--o', type=str, required=False, default="Reduced",
                               help='name for output files')
     return parser_inner.parse_args()
 
 
 def main():
+    """
+    The main body of the code that calls all the functions required to filter the vcf files and
+    generate fasta files
+
+    """
     args = parse_args()
     vcf_file = args.in_vcf
     out = args.o
@@ -29,23 +47,21 @@ def main():
     try:
         reader = vcfpy.Reader.from_path(vcf_file)
     except FileNotFoundError:
-        print(
-            f"There was an error in reading {vcf_file}.  "
-            f"Verify that the file exists")
+        print(f"There was an error in reading {vcf_file}.  Verify that the file exists")
         raise SystemExit(0)
     except vcfpy.exceptions.IncorrectVCFFormat:
-        print(
-            f"There was an error in reading {vcf_file}.  "
-            f"Verify that the file is in the correct format")
+        print(f"There was an error in reading {vcf_file}.  Verify that the file is in the correct "
+              f"format")
         raise SystemExit(0)
     if not args.keep_csv:
         infile = args.remove_csv
-        Opp = 0
+        opp = 0
     elif not args.remove_csv:
         infile = args.keep_csv
-        Opp = 1
+        opp = 1
     else:
-        print("Select one reduction method: either list positions to keep or list positions to remove")
+        print("Select one reduction method: either list positions to keep or list positions to "
+              "remove")
         raise SystemExit(0)
     try:
         with open(infile) as tsvfile:
@@ -66,10 +82,11 @@ def main():
             continue
         position = f"{record.POS}"
         in_vcf.append(position)
-        if Opp == 1 :
+        if opp == 1:
             if position in pos_list:
                 writer.write_record(record)
-                # pull the positional information and the reference value and all the alt values from the vcf file
+                # pull the positional information and the reference value and all the alt values
+                # from the vcf file
                 line = [record.CHROM, record.POS, record.REF]
                 line += [alt.value for alt in record.ALT]
 
@@ -89,10 +106,11 @@ def main():
                     else:
                         fasta_dict[sample_name] += alt_base
                     tracker += 1
-        if Opp == 0 :
+        if opp == 0:
             if position not in pos_list:
                 writer.write_record(record)
-                # pull the positional information and the reference value and all the alt values from the vcf file
+                # pull the positional information and the reference value and all the alt values
+                # from the vcf file
                 line = [record.CHROM, record.POS, record.REF]
                 line += [alt.value for alt in record.ALT]
 
@@ -113,18 +131,20 @@ def main():
                         fasta_dict[sample_name] += alt_base
                     tracker += 1
     # display a warning if the supplied csv list is not a subset of all the positions in the file
-    if not (all(x in in_vcf for x in pos_list)):
-        print("WARNING:\nOne or more positions in the supplied csv file are not found in the original vcf file")
-    flag =0
+    if not all(x in in_vcf for x in pos_list):
+        print("WARNING:\nOne or more positions in the supplied csv file are not found in the "
+              "original vcf file")
+    flag = 0
     in_vcf.sort()
     for i in range(0, (len(in_vcf)-1)):
         if in_vcf[i] == in_vcf[i+1]:
             flag = 1
 
     if flag:
-        print("WARNING:\nOne or more entries in the supplied vcf file contained the same numerical position value."
-              " Both entries were processed in the desired manner i.e. if the position value was to be kept both were "
-              "kept, if they were to be removed they were both removed")
+        print("WARNING:\nOne or more entries in the supplied vcf file contained the same numerical"
+              " position value.  Both entries were processed in the desired manner i.e. if the "
+              "position value was to be kept both were kept, if they were to be removed they were "
+              "both removed")
 
     fasta_file = open(os.path.join(out_path, f"{out}.fasta"), "w+")
     for key in fasta_dict.keys():
