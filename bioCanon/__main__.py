@@ -774,6 +774,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
               "are not the same as the ones in the VCF file")
         print(f"The samples found in one of the files but not the other are : {discr}")
         raise SystemExit(0)
+
     if min_group_size > len(samples):
         print("The selected value for the minimum group size is larger than the number of "
               "samples.  This will not produce results.  Please select a smaller number ")
@@ -786,6 +787,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     if min_snps > 20:
         print("WARNING: the number selected for the number of snps required to support a group is"
               " large enough that there may not be any results")
+
     scheme = dict()
     all_variable = []
     ignored_for_groupsize = []
@@ -978,8 +980,8 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
             printed.append(i)
     for i in not_mapped_pos:
         if i not in printed:
-            snp_report.write(f"The snp at {i} was not included in the scheme because it could not "
-                             f"be matched to a branch point in the data.\n")
+            snp_report.write(f"The snp at {i} was not included in the scheme because it could not be"
+                             f" matched to a branch point in the data.\n")
             printed.append(i)
     for i in ignored_for_degenerate_kmer:
         if i not in printed:
@@ -1053,16 +1055,15 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 if len(scheme[rank][g_id][item]["qc_warnings"]) != 0:
                     if position not in printed:
                         reasons = scheme[rank][g_id][item]["qc_warnings"]
-                        snp_report.write(f"The snp at {position} was not included in the scheme due"
-                                         f" to {reasons}\n")
+                        snp_report.write(f"The snp at {position} was not included in the scheme due "
+                                         f"to {reasons}\n")
                         printed.append(position)
                     continue
                 if rank_id != first_instance[code]:
                     if position not in printed:
                         onion_snps += 1
-                        snp_report.write(f"The snp at {position} was not included in the scheme "
-                                         f"because the number of size difference between its group "
-                                         f"and the parent group was less than"
+                        snp_report.write(f"The snp at {position} was not included in the scheme because the number of "
+                                         f"size difference between its group and the parent group was less than"
                                          f" {min_parent_size}.\n")
                         printed.append(position)
                     continue
@@ -1085,8 +1086,8 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 fasta_file.write(f">{position}-{code}\n{pos_tile}\n")
                 log.write(f"negative{position}\t{code}\t{neg_tile}\n")
                 fasta_file.write(f">negative{position}-{code}\n{neg_tile}\n")
-    print(f" {onion_snps} of these were ignored because the group they defined was too close to the"
-          f" parent group in size")
+    print(f" {onion_snps} of these were ignored because the group they defined was too close to the "
+          f"parent group in size")
     log.close()
     fasta_file.close()
 
