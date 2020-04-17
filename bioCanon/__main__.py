@@ -815,8 +815,9 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         all_variable.append(position)
         # go through the samples and divide them by alt vs ref bases
         ref_group, alt_group = alt_or_ref(record, samples)
-        if len(ref_group) == len(leaves)-1 or len(alt_group) == len(leaves)-1:
+        if len(ref_group) == 0 or len(alt_group) == 0:
             all_same.append(record.POS)
+            continue
         # generate places to put group and rank information
         valid_ranks = list()
         valid_ranks_alt = list()
@@ -975,28 +976,26 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                                              f"snp_report.txt"), "w+")
     for i in all_same:
         if i not in printed:
-            snp_report.write(f"The snp at {i} was not included in the scheme because there was no "
-                             f"variability in the supplied vcf file\n")
+            snp_report.write(f"{i}\tN\t\t no variability in the supplied vcf file\n")
             printed.append(i)
     for i in not_mapped_pos:
         if i not in printed:
-            snp_report.write(f"The snp at {i} was not included in the scheme because it could not be"
-                             f" matched to a branch point in the data.\n")
+            snp_report.write(f"{i}\tN\t\t could not be matched to a branch point in the data.\n")
             printed.append(i)
     for i in ignored_for_degenerate_kmer:
         if i not in printed:
-            snp_report.write(f"The snp at {i} was not included in the scheme because a "
-                             f"non-degenerate {flanking*2+1}bp kmer could not be generated.\n")
+            snp_report.write(f"{i}\tN\t\t a non-degenerate {flanking*2+1}bp kmer "
+                             f"could not be generated.\n")
             printed.append(i)
     for i in ignored_for_groupsize:
         if i not in printed:
-            snp_report.write(f"The snp at {i} was not included in the scheme because the group it"
-                             f" supported was smaller than {min_group_size}.\n")
+            snp_report.write(f"{i}\tN\t\t the group it supported was smaller than"
+                             f" {min_group_size}.\n")
             printed.append(i)
     for i in ignored_for_snps:
         if i not in printed:
-            snp_report.write(f"The snp at {i} was not included in the scheme because the number of "
-                             f"snps that defined its group was smaller than {min_group_size}.\n")
+            snp_report.write(f"{i}\tN\t\t the number of snps that defined its group "
+                             f"was smaller than {min_group_size}.\n")
             printed.append(i)
     first_instance = dict()
     no_branchpoint = len(not_mapped_pos)
@@ -1055,15 +1054,14 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 if len(scheme[rank][g_id][item]["qc_warnings"]) != 0:
                     if position not in printed:
                         reasons = scheme[rank][g_id][item]["qc_warnings"]
-                        snp_report.write(f"The snp at {position} was not included in the scheme due "
-                                         f"to {reasons}\n")
+                        snp_report.write(f"{position}\tN\t\t{reasons}\n")
                         printed.append(position)
                     continue
                 if rank_id != first_instance[code]:
                     if position not in printed:
                         onion_snps += 1
-                        snp_report.write(f"The snp at {position} was not included in the scheme because the number of "
-                                         f"size difference between its group and the parent group was less than"
+                        snp_report.write(f"T{position}\tN\t\tthe number of size difference between "
+                                         f"its group and the parent group was less than"
                                          f" {min_parent_size}.\n")
                         printed.append(position)
                     continue
@@ -1075,13 +1073,14 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                     elif code == "2":
                         two_codes = 0
                     else:
+                        print("_-_")
                         continue
                 # extract the required information from the entries that have good qc
                 pos_tile = scheme[rank][g_id][item]["positive_tile"]
                 neg_tile = scheme[rank][g_id][item]["negative_tile"]
                 printed.append(position)
                 # write out the biohansel fasta files and the accompanying logs
-                snp_report.write(f"The snp at {position} was found to support the {code} group.\n")
+                snp_report.write(f"{position}\tY\t{code}\n")
                 log.write(f"{position}\t{code}\t{pos_tile}\n")
                 fasta_file.write(f">{position}-{code}\n{pos_tile}\n")
                 log.write(f"negative{position}\t{code}\t{neg_tile}\n")
