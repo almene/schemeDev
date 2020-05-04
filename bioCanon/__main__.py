@@ -7,6 +7,7 @@ to serve as the basis for automatic scheme development
 import csv
 import re
 import os
+import logging
 from argparse import ArgumentParser
 import numpy as np
 import pandas as pd
@@ -46,6 +47,8 @@ def parse_args():
                                    "generation")
     parser_inner.add_argument('--outdir', type=str, required=False, default=os.getcwd(),
                               help='Output Directory to put results')
+    parser_inner.add_argument('--verbosity', type=str, required=False, default="INFO",
+                              help='desired messaging level: info, warning, debug')
     return parser_inner.parse_args()
 
 
@@ -815,6 +818,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         all_variable.append(position)
         # go through the samples and divide them by alt vs ref bases
         ref_group, alt_group = alt_or_ref(record, samples)
+        # if all the samples have the same snp then either the alt group or the ref group is empty
         if len(ref_group) == 0 or len(alt_group) == 0:
             all_same.append(record.POS)
             continue
@@ -927,8 +931,9 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                         ignored_for_groupsize.append(scheme[rank][g_id][item]["position"])
             else:
                 for item in range(0, len(scheme[rank][g_id])):
+                    position = (scheme[rank][g_id][item]["position"])
                     if position not in branchpoint_snps:
-                        branchpoint_snps.append((scheme[rank][g_id][item]["position"]))
+                        branchpoint_snps.append(position)
     printed = []
     stripped_pos = []
     for rank in scheme:
@@ -961,12 +966,12 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     if not os.path.exists(outdir):
         os.mkdir(outdir)
     out_path = os.path.join(os.getcwd(), outdir)
-    codes = open(os.path.join(out_path, "codes.log"), "w+")
+    codes = open(os.path.join(out_path, "codes.tsv"), "w+")
     for i in range(0, len(leaves) - 1):
         if len(biohansel_codes.values[i]) == 0:
             print("Something has gone wrong with the code assignments")
             raise SystemExit(0)
-        codes.write(f"{biohansel_codes.index[i]} : {biohansel_codes.values[i, -1]}\n")
+        codes.write(f"{biohansel_codes.index[i]}\t{biohansel_codes.values[i, -1]}\n")
     codes.close()
     log = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}_biohansel.log"),
                "w+")
@@ -974,6 +979,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                                              f"_biohansel.fasta"), "w+")
     snp_report = open(os.path.join(out_path, f"S{min_snps}G{min_group_size}"
                                              f"snp_report.txt"), "w+")
+    snp_report.write(f"Position\tIncluded\tSupports\t Exclusion Reason\n")
     for i in all_same:
         if i not in printed:
             snp_report.write(f"{i}\tN\t\t no variability in the supplied vcf file\n")
@@ -1009,6 +1015,9 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         print(total_snps - (found + no_branchpoint + len(all_same)))
         print(np.setdiff1d(all_variable, np.union1d(all_same, np.union1d(branchpoint_snps,
                                                                          not_mapped_pos))))
+        print(f"{all_variable}\nset linked to branchpoints:\t{branchpoint_snps}\n"
+              f"set not linked to branchpoint:\t{not_mapped_pos}\n"
+              f"set all same state:\t{all_same}")
     print(f"There were {total_snps} snps in the vcf file.\n "
           f"{len(all_same)} all had the same state.\n "
           f"{no_branchpoint} did not match a branch point.\n "
@@ -1085,8 +1094,8 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
                 fasta_file.write(f">{position}-{code}\n{pos_tile}\n")
                 log.write(f"negative{position}\t{code}\t{neg_tile}\n")
                 fasta_file.write(f">negative{position}-{code}\n{neg_tile}\n")
-    print(f" {onion_snps} of these were ignored because the group they defined was too close to the "
-          f"parent group in size")
+    print(f" {onion_snps} of these were ignored because the group they defined was too close to the"
+          f" parent group in size")
     log.close()
     fasta_file.close()
 
@@ -1097,6 +1106,10 @@ def main():
     """
     # collect relevant user input and parse it into the appropriate variables
     args = parse_args()
+    log_level = args.verbosity
+    numeric_level = getattr(logging, log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % log_level)
     groups = path_check(args.group_info, args.in_nwk)
     numerical_parameters = [args.min_snps, args.min_members, args.min_parent, args.flanking]
     tile_generator(args.reference, args.in_vcf, numerical_parameters, groups, args.outdir)
