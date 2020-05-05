@@ -117,16 +117,73 @@ Name for an output directory
 ### Outputs
 Three files will be produced by a successful run of the bioCanon module:
 * codes.log
+  * tab delimited
   * This file contains the samples used to build the scheme along with the biohansel code that they were assigned by the scheme
-* a biohansel.fasta file
+  ```
+  Q	1.6
+  R	1.6
+  O	1.6
+  P	1.6
+  J	1.6
+  I	1
+  H	1
+  G	1.5
+  S	1.2
+  ...
+  ```
+* a S[x]G[y]_biohansel.fasta file
+  *standard fasta formating
   * This file contains all the non-degenerate positve and negative k-mers required for a biohansel scheme.  This will require further filtering for optimal scheme development
-* a biohansel.log file
+  * Naming convention is to include parameter information [x] is the required snp support per valid group and [y] is the minimum group size 
+    ```
+    >305-1
+    GAACAGTGCGGGCTTTTTTTTCGACCAGAGA
+    >negative305-1
+    GAACAGTGCGGGCTTGTTTTTCGACCAGAGA
+    >2685-1
+    GGCGTTCTACAGCCATTATTATCAGCCCTTG
+    >negative2685-1
+    GGCGTTCTACAGCCACTATTATCAGCCCTTG
+    >5021-1
+    ATGACCCGCCAGTAATCATTGCGCCCGGTGG
+    ...
+    ```
+* a S[x]G[y]_biohansel.log file
+  * tab delimited
   * This file contains a more human-readable version of the information contained in the biohansel.fasta file
+  * Naming convention is to include parameter information [x] is the required snp support per valid group and [y] is the minimum group size
+    ```
+    305	1	GAACAGTGCGGGCTTTTTTTTCGACCAGAGA
+    negative305	1	GAACAGTGCGGGCTTGTTTTTCGACCAGAGA
+    2685	1	GGCGTTCTACAGCCATTATTATCAGCCCTTG
+    negative2685	1	GGCGTTCTACAGCCACTATTATCAGCCCTTG
+    5021	1	ATGACCCGCCAGTAATCATTGCGCCCGGTGG
+    negative5021	1	ATGACCCGCCAGTAACCATTGCGCCCGGTGG
+    5392	1	CAGATTCACCACCACACGATCGCCCTGCGCC
+    negative5392	1	CAGATTCACCACCACCCGATCGCCCTGCGCC
+    1180	1	CAGATCCCCTGTCTGTTTAAAAATACCGGTA
+    negative1180	1	CAGATCCCCTGTCTGATTAAAAATACCGGTA
+    ...
+    ```
+* a S[x]G[y]snp_report.txt file
+  * tab delimited
+  * This file contains a detailed report of the results of bioCanon for each snp in the vcf file
+  * Naming convention is to include parameter information [x] is the required snp support per valid group and [y] is the minimum group size
+    ```
+    Position	Included	Supports	 Exclusion Reason
+    1366	N		 no variability in the supplied vcf file
+    68	N		 could not be matched to a branch point in the data.
+    1017	N		 could not be matched to a branch point in the data.
+    366	N		 a non-degenerate 31bp kmer could not be generated.
+    945	N		 a non-degenerate 31bp kmer could not be generated.
+    2050	N		 a non-degenerate 31bp kmer could not be generated.
+    T6736	N		the number of size difference between its group and the parent group was less than 1.
+    T6991	N		the number of size difference between its group and the parent group was less than 1.
+    5110	Y	1.1
+    9797	Y	1.6
+    ...
+    ```
 
-Names for the biohansel.fasta and biohansel.log files are derived from the options used to construct them.  The naming structure is as follows:
-```
-S(min snps)G(min group size)\_biohansel.fasta(or log)
-```
 ## Running the tests
 
 Tests for the module can be found in the repository under the tests subfolder.  They are pytest compatible scripts and once downloaded can be read using the python -m pytest command from the downloaded repository directory.
