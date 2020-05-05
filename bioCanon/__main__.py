@@ -235,7 +235,7 @@ def tsv_to_membership(infile):
             groups[key].append(0)
     # ensure that all entries are numbers and replace to unique numbers if not already
     non_valid = r'[^0-9/.]'
-    warning = 0
+    warn = 0
     for i in range(0, max_len):
         switch = dict()
         for key in groups:
@@ -245,10 +245,10 @@ def tsv_to_membership(infile):
             # check to see if the value contains only the accepted characters,
             # if it contains illegal characters rename the groups
             if re.search(non_valid, checking):
-                if warning == 0:
-                    print("provided groups contain invalid characters for biohansel codes."
-                          "New codes will be generated")
-                    warning = 1
+                if warn == 0:
+                    logging.warning("provided groups contain invalid characters for biohansel "
+                                    "codes. New codes will be generated")
+                    warn = 1
                 iterators = [i, key]
                 generate_new_codes(checking, switch, groups, used, iterators)
     return groups
@@ -788,8 +788,8 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
               " a smaller number ")
         raise SystemExit(0)
     if min_snps > 20:
-        print("WARNING: the number selected for the number of snps required to support a group is"
-              " large enough that there may not be any results")
+        logging.warning(" the number selected for the number of snps required to support a group is"
+                        " large enough that there may not be any results")
 
     scheme = dict()
     all_variable = []
@@ -969,7 +969,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     codes = open(os.path.join(out_path, "codes.tsv"), "w+")
     for i in range(0, len(leaves) - 1):
         if len(biohansel_codes.values[i]) == 0:
-            print("Something has gone wrong with the code assignments")
+            logging.error("Something has gone wrong with the code assignments")
             raise SystemExit(0)
         codes.write(f"{biohansel_codes.index[i]}\t{biohansel_codes.values[i, -1]}\n")
     codes.close()
@@ -1011,11 +1011,11 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
     s_size = len(ignored_for_snps)
     found = len(branchpoint_snps)
     if total_snps != (found + no_branchpoint + len(all_same)):
-        print("Count logic off")
-        print(total_snps - (found + no_branchpoint + len(all_same)))
-        print(np.setdiff1d(all_variable, np.union1d(all_same, np.union1d(branchpoint_snps,
+        logging.debug("Count logic off")
+        logging.debug(total_snps - (found + no_branchpoint + len(all_same)))
+        logging.debug(np.setdiff1d(all_variable, np.union1d(all_same, np.union1d(branchpoint_snps,
                                                                          not_mapped_pos))))
-        print(f"{all_variable}\nset linked to branchpoints:\t{branchpoint_snps}\n"
+        logging.debug(f"{all_variable}\nset linked to branchpoints:\t{branchpoint_snps}\n"
               f"set not linked to branchpoint:\t{not_mapped_pos}\n"
               f"set all same state:\t{all_same}")
     print(f"There were {total_snps} snps in the vcf file.\n "
@@ -1110,6 +1110,8 @@ def main():
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % log_level)
+    logging.basicConfig(filename='bioCannon.log', filemode='w',
+                        format='%(name)s - %(levelname)s - %(message)s')
     groups = path_check(args.group_info, args.in_nwk)
     numerical_parameters = [args.min_snps, args.min_members, args.min_parent, args.flanking]
     tile_generator(args.reference, args.in_vcf, numerical_parameters, groups, args.outdir)
