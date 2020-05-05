@@ -117,6 +117,7 @@ Name for an output directory
 ### Outputs
 Three files will be produced by a successful run of the bioCanon module:
 * codes.log
+  * tab delimited
   * This file contains the samples used to build the scheme along with the biohansel code that they were assigned by the scheme
   ```
   Q	1.6
@@ -131,6 +132,7 @@ Three files will be produced by a successful run of the bioCanon module:
   ...
   ```
 * a S[x]G[y]_biohansel.fasta file
+  *standard fasta formating
   * This file contains all the non-degenerate positve and negative k-mers required for a biohansel scheme.  This will require further filtering for optimal scheme development
   * Naming convention is to include parameter information [x] is the required snp support per valid group and [y] is the minimum group size 
     ```
@@ -147,6 +149,7 @@ Three files will be produced by a successful run of the bioCanon module:
     ...
     ```
 * a S[x]G[y]_biohansel.log file
+  * tab delimited
   * This file contains a more human-readable version of the information contained in the biohansel.fasta file
   * Naming convention is to include parameter information [x] is the required snp support per valid group and [y] is the minimum group size
     ```
@@ -163,6 +166,7 @@ Three files will be produced by a successful run of the bioCanon module:
     ...
     ```
 * a S[x]G[y]snp_report.txt file
+  * tab delimited
   * This file contains a detailed report of the results of bioCanon for each snp in the vcf file
   * Naming convention is to include parameter information [x] is the required snp support per valid group and [y] is the minimum group size
     ```
