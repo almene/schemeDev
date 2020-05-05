@@ -204,32 +204,42 @@ def tsv_to_membership(infile):
     groups = dict()
     used = dict()
     try:
+        initial = []
+        groups = dict()
         with open(infile) as tsvfile:
             reader = csv.reader(tsvfile, delimiter="\t")
-            max_len = 0
             for row in reader:
+                if len(row) == 0:
+                    continue
+                if len(row) != 2:
+                    print("There is something wrong with the input file, "
+                          "either a sample name is missing or a code is missing")
+                    raise SystemExit(0)
                 leaf = row[0]
-                if len(row) > max_len:
-                    max_len = len(row)
-                for i in range(1, len(row)):
-                    if row[i] == "":
-                        if i == len(row) - 1:
-                            break
-                        print("There is an error in your tsv file "
-                              "as there are empty internal columns")
-                        raise SystemExit(0)
-                    if leaf not in groups.keys():
-                        groups[leaf] = [row[i]]
-                    else:
-                        groups[leaf].append(row[i])
-                    if i not in used.keys():
-                        used[i] = [row[i]]
-                    else:
-                        used[i].append(row[i])
+                bh_code = row[1]
+                initial.append((leaf, bh_code))
+
     except FileNotFoundError:
         print("There was an error reading the tsv file.  Check the file name and try again")
         raise SystemExit(0)
     # ensure that all values are the same length for later matrix creation
+    for i in range(0, len(initial)):
+        to_split = initial[i][1]
+        categories = to_split.split(".")
+        last = ""
+        for j in range(0, len(categories)):
+            if j == 0:
+                last = categories[0]
+                add = last
+                groups[initial[i][0]] = [add]
+            else:
+                add = last + "." + categories[j]
+                last = add
+                groups[initial[i][0]].append(add)
+    max_len=0
+    for key in groups:
+        if len(groups[key]) > max_len:
+            max_len = len(groups[key])
     for key in groups:
         while len(groups[key]) < max_len:
             groups[key].append(0)
@@ -967,7 +977,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         os.mkdir(outdir)
     out_path = os.path.join(os.getcwd(), outdir)
     codes = open(os.path.join(out_path, "codes.tsv"), "w+")
-    for i in range(0, len(leaves) - 1):
+    for i in range(0, len(leaves)):
         if len(biohansel_codes.values[i]) == 0:
             logging.error("Something has gone wrong with the code assignments")
             raise SystemExit(0)
