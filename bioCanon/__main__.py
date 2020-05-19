@@ -977,7 +977,7 @@ def tile_generator(reference_fasta, vcf_file, numerical_parameters, groups, outd
         os.mkdir(outdir)
     out_path = os.path.join(os.getcwd(), outdir)
     codes = open(os.path.join(out_path, "codes.tsv"), "w+")
-    for i in range(0, len(leaves)):
+    for i in range(0, len(leaves) - 1):
         if len(biohansel_codes.values[i]) == 0:
             logging.error("Something has gone wrong with the code assignments")
             raise SystemExit(0)
